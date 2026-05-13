@@ -1,0 +1,30 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Amsterdam
+    open-pull-requests-limit: 5
+    labels: [dependencies]
+    groups:
+      astro:
+        patterns: ['astro', '@astrojs/*']
+      lint:
+        patterns: ['@biomejs/*', 'eslint*', 'typescript-eslint', 'astro-eslint-parser']
+      vanilla-extract:
+        patterns: ['@vanilla-extract/*']
+      types:
+        patterns: ['@types/*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Amsterdam
+    open-pull-requests-limit: 3
+    labels: [dependencies, ci]

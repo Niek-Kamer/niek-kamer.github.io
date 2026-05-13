@@ -1,0 +1,82 @@
+---
+// Fraunces `opsz.css` ships weight + optical-size axes in one variable file
+// (~67KB latin), so `font-optical-sizing: auto` picks the right cut per size.
+// The default `index.css` is weight-only and would make the `opsz` axis a no-op.
+import '@fontsource-variable/fraunces/opsz.css';
+import '@fontsource-variable/jetbrains-mono/index.css';
+import '../styles/theme.css';
+import '../styles/global.css';
+
+import BaseHead from '../components/seo/BaseHead.astro';
+import Header from '../components/layout/navigation/Header.astro';
+import Footer from '../components/layout/footer/Footer.astro';
+import Container from '../components/primitives/Container.astro';
+import { sprinkles } from '../styles/sprinkles.css';
+import { site } from '../data/site';
+import * as styles from './styles/BaseLayout.css';
+
+interface Props {
+	title?: string;
+	description?: string;
+	image?: string;
+	type?: 'website' | 'article';
+	canonical?: string;
+	noindex?: boolean;
+	publishedAt?: Date;
+	updatedAt?: Date;
+	// Set to true on pages that include KaTeX-rendered math. Loads the
+	// stylesheet via CDN only for those pages so non-math pages skip ~25KB.
+	math?: boolean;
+}
+
+const props = Astro.props;
+
+// Vertical rhythm scales with viewport — tighter on mobile, breathing room
+// on widescreens. All values come from `vars.space`.
+const mainPadding = sprinkles({
+	paddingBlock: { base: 'xl', md: '2xl', xl: '3xl' },
+});
+---
+
+<!doctype html>
+<html lang={site.locale}>
+	<head>
+		<BaseHead {...props} />
+		{props.math && (
+			<link
+				rel="stylesheet"
+				href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css"
+				crossorigin="anonymous"
+			/>
+		)}
+		<!--
+			Inline pre-paint script: read stored theme or system preference and set
+			the `data-theme` attribute before stylesheets evaluate, eliminating the
+			light/dark flash. Falls back to light if storage access throws (privacy
+			browsers, sandboxed contexts).
+		-->
+		<script is:inline>
+			(() => {
+				try {
+					const stored = localStorage.getItem('theme');
+					const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+					document.documentElement.dataset.theme = stored ?? (prefersDark ? 'dark' : 'light');
+				} catch {
+					document.documentElement.dataset.theme = 'light';
+				}
+			})();
+		</script>
+	</head>
+	<body>
+		<a href="#main" class="skip-link">Skip to content</a>
+		<div class={styles.shell}>
+			<Header />
+			<main id="main" class:list={[styles.main, mainPadding]}>
+				<Container>
+					<slot />
+				</Container>
+			</main>
+			<Footer />
+		</div>
+	</body>
+</html>

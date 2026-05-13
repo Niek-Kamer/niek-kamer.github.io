@@ -1,0 +1,16 @@
+name: Suggestion
+description: An idea, a typo, a content correction, or feedback.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What's the suggestion?
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why does it matter?
+      description: Context helps decide priority.

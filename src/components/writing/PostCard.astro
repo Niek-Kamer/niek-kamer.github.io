@@ -1,0 +1,41 @@
+---
+/**
+ * One entry in a writing list. Takes a pre-shaped card (href, iso, date,
+ * title, description, hashTags) so the parent loop stays free of nested
+ * member access + sub-maps — Astro's JSX parser doesn't love deeply nested
+ * arrow-into-arrow-into-JSX expressions.
+ */
+import Stack from '../primitives/Stack.astro';
+import Cluster from '../primitives/Cluster.astro';
+import { sprinkles } from '../../styles/sprinkles.css';
+import * as styles from './styles/PostCard.css';
+
+interface Props {
+	card: {
+		href: string;
+		iso: string;
+		date: string;
+		title: string;
+		description: string;
+		hashTags: string[];
+	};
+}
+
+const { card } = Astro.props;
+
+const titleCls = sprinkles({ fontSize: 'xl', fontWeight: 'semibold' });
+const descCls = sprinkles({ color: 'textMuted' });
+---
+
+<a href={card.href} class={styles.link}>
+	<Stack gap="xs">
+		<time datetime={card.iso} class={styles.date}>{card.date}</time>
+		<h2 class={titleCls}>{card.title}</h2>
+		<p class={descCls}>{card.description}</p>
+		{card.hashTags.length > 0 && (
+			<Cluster as="ul" gap="xs" class={styles.tagList}>
+				{card.hashTags.map((tag) => <li>{tag}</li>)}
+			</Cluster>
+		)}
+	</Stack>
+</a>

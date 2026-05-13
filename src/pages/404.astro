@@ -1,0 +1,32 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Container from '../components/primitives/Container.astro';
+import ProseBand from '../components/primitives/ProseBand.astro';
+import Stack from '../components/primitives/Stack.astro';
+import { sprinkles } from '../styles/sprinkles.css';
+
+const code = sprinkles({
+	fontSize: 'display',
+	fontWeight: 'semibold',
+	letterSpacing: 'tight',
+	lineHeight: 'tight',
+	color: 'textSubtle',
+});
+const subtitle = sprinkles({ fontSize: 'lg', color: 'textMuted' });
+const backLink = sprinkles({ fontSize: 'base', fontWeight: 'medium', color: 'accent' });
+---
+
+<BaseLayout title="404 — not found" noindex>
+	<Container>
+		<ProseBand>
+			<Stack as="section" gap="lg" align="flex-start">
+				<p class={code}>404</p>
+				<p class={subtitle}>
+					That page isn't here. Could be a typo, a stale link, or something I
+					haven't built yet.
+				</p>
+				<a href="/" class={backLink}>{'Back home →'}</a>
+			</Stack>
+		</ProseBand>
+	</Container>
+</BaseLayout>

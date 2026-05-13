@@ -1,0 +1,70 @@
+---
+/**
+ * Content + sidebar layout. Stacks on small screens; goes side-by-side at
+ * `breakpoint` (default `md`). The sidebar's width is fixed; content
+ * absorbs the rest.
+ *
+ *   <Sidebar>
+ *     <article slot="content">…</article>
+ *     <aside slot="side">…</aside>
+ *   </Sidebar>
+ *
+ * The `sideFirst` flag inverts visual order without touching the DOM order
+ * — content stays first in source for a11y.
+ */
+import type { HTMLAttributes } from 'astro/types';
+import { sprinkles, type Sprinkles } from '../../styles/sprinkles.css';
+import { vars } from '../../styles/theme.css';
+import * as styles from './styles/Sidebar.css';
+
+interface Props extends HTMLAttributes<'div'> {
+	gap?: Sprinkles['gap'];
+	// Width of the sidebar at the side-by-side breakpoint. Token-keyed via
+	// `space` for narrow rails (≤ 12rem) or `measure` for wider ones.
+	sideWidth?: keyof typeof vars.measure | keyof typeof vars.space;
+	// At which breakpoint to switch from stacked to side-by-side.
+	at?: 'sm' | 'md' | 'lg' | 'xl';
+	// Render the side area visually before content (DOM order preserved).
+	sideFirst?: boolean;
+}
+
+const {
+	gap = 'lg',
+	sideWidth = 'narrow',
+	at = 'md',
+	sideFirst = false,
+	class: className,
+	...rest
+} = Astro.props;
+
+const wrapperCls = sprinkles({
+	gap,
+});
+
+// Resolve the runtime width to a CSS-variable reference. `vars.measure.*` and
+// `vars.space.*` both compile to `var(--…)` strings.
+const widthRef =
+	sideWidth in vars.measure
+		? vars.measure[sideWidth as keyof typeof vars.measure]
+		: vars.space[sideWidth as keyof typeof vars.space];
+
+const variantKey = `${at}_${sideFirst ? 'side' : 'content'}` as keyof typeof styles.layouts;
+---
+
+<div
+	class:list={[styles.base, styles.layouts[variantKey], wrapperCls, className]}
+	style={`--sidebar-width: ${widthRef};`}
+	{...rest}
+>
+	{sideFirst ? (
+		<>
+			<aside><slot name="side" /></aside>
+			<div><slot name="content" /></div>
+		</>
+	) : (
+		<>
+			<div><slot name="content" /></div>
+			<aside><slot name="side" /></aside>
+		</>
+	)}
+</div>

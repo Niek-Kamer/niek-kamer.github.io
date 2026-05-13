@@ -1,0 +1,28 @@
+[
+	{
+		"label": "astro dev",
+		"command": "bun",
+		"args": ["run", "dev"],
+		"reveal": "always",
+		"use_new_terminal": false,
+		"allow_concurrent_runs": false
+	},
+	{
+		"label": "astro build",
+		"command": "bun",
+		"args": ["run", "build"],
+		"reveal": "always"
+	},
+	{
+		"label": "astro preview",
+		"command": "bun",
+		"args": ["run", "preview"],
+		"reveal": "always"
+	},
+	{
+		"label": "check (biome + eslint)",
+		"command": "bun",
+		"args": ["run", "check"],
+		"reveal": "always"
+	}
+]

@@ -1,0 +1,30 @@
+---
+import Cluster from '../../primitives/Cluster.astro';
+import Container from '../../primitives/Container.astro';
+import { sprinkles } from '../../../styles/sprinkles.css';
+import Brand from './Brand.astro';
+import Nav from './Nav.astro';
+import ThemeSwitcher from '../controls/ThemeSwitcher.astro';
+import * as styles from './styles/Header.css';
+
+const headerPadding = sprinkles({
+	paddingBlock: { base: 'md', md: 'lg' },
+});
+---
+
+<header class={styles.header}>
+	<Container>
+		<Cluster
+			justify="space-between"
+			align="center"
+			gap="lg"
+			class={headerPadding}
+		>
+			<Brand />
+			<Cluster gap="md" align="center">
+				<Nav />
+				<ThemeSwitcher />
+			</Cluster>
+		</Cluster>
+	</Container>
+</header>

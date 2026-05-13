@@ -1,0 +1,38 @@
+---
+/**
+ * Horizontal cluster that wraps when it runs out of room — tags, nav lists,
+ * social rows. Defaults to centre-aligned with `md` gap.
+ *
+ *   <Cluster gap="sm" justify="space-between">…</Cluster>
+ */
+import type { HTMLAttributes } from 'astro/types';
+import { sprinkles, type Sprinkles } from '../../styles/sprinkles.css';
+
+interface Props extends HTMLAttributes<'div'> {
+	as?: 'div' | 'nav' | 'ul' | 'ol' | 'header' | 'footer';
+	gap?: Sprinkles['gap'];
+	align?: Sprinkles['alignItems'];
+	justify?: Sprinkles['justifyContent'];
+}
+
+const {
+	as: Tag = 'div',
+	gap = 'md',
+	align = 'center',
+	justify = 'flex-start',
+	class: className,
+	...rest
+} = Astro.props;
+
+const cls = sprinkles({
+	display: 'flex',
+	flexWrap: 'wrap',
+	gap,
+	alignItems: align,
+	justifyContent: justify,
+});
+---
+
+<Tag class:list={[cls, className]} {...rest}>
+	<slot />
+</Tag>

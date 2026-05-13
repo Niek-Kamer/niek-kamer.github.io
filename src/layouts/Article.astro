@@ -1,0 +1,67 @@
+---
+/**
+ * Article layout for individual writing entries. Wraps the MDX content in a
+ * centred prose column with an article header (title, description, date,
+ * tags). KaTeX CSS is loaded via the `math` prop on `BaseLayout` at the
+ * page level — this layout doesn't import it.
+ */
+import type { CollectionEntry } from 'astro:content';
+import Stack from '../components/primitives/Stack.astro';
+import Cluster from '../components/primitives/Cluster.astro';
+import WideBand from '../components/primitives/WideBand.astro';
+import { sprinkles } from '../styles/sprinkles.css';
+import { prose } from '../styles/prose.css';
+import * as styles from './styles/Article.css';
+
+interface Props {
+	entry: CollectionEntry<'writing'>;
+}
+
+const { entry } = Astro.props;
+const { title, description, publishedAt, updatedAt, tags } = entry.data;
+
+const formatter = new Intl.DateTimeFormat('en', {
+	year: 'numeric',
+	month: 'long',
+	day: 'numeric',
+});
+
+const titleCls = sprinkles({
+	fontSize: 'h1',
+	fontWeight: 'semibold',
+	letterSpacing: 'tight',
+	lineHeight: 'tight',
+});
+
+const descCls = sprinkles({
+	fontSize: 'lg',
+	color: 'textMuted',
+});
+---
+
+<WideBand as="article">
+	<Stack gap="2xl">
+		<header>
+			<Stack gap="md">
+				<h1 class={titleCls}>{title}</h1>
+				<p class={descCls}>{description}</p>
+				<Cluster gap="md" class={styles.meta}>
+					<time datetime={publishedAt.toISOString()}>
+						{formatter.format(publishedAt)}
+					</time>
+					{updatedAt && <span>Updated {formatter.format(updatedAt)}</span>}
+					{tags.length > 0 && (
+						<Cluster as="ul" gap="xs" class={styles.tagList}>
+							{tags.map((t) => (
+								<li class={styles.tag}>{'#' + t}</li>
+							))}
+						</Cluster>
+					)}
+				</Cluster>
+			</Stack>
+		</header>
+		<div class={prose}>
+			<slot />
+		</div>
+	</Stack>
+</WideBand>

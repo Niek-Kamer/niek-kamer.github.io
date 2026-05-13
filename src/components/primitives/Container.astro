@@ -1,0 +1,42 @@
+---
+/**
+ * Bounded, centred layout container. Default caps at `container` (80rem) and
+ * stays centred at all widths — the standard web layout. Pages that want to
+ * use widescreen real estate (dense grids, sidebars) should opt into a wider
+ * `size` explicitly.
+ *
+ *   <Container>                                centred, ≤80rem at all sizes
+ *   <Container size="prose">                   65ch reading column
+ *   <Container size={{ base: 'container', '3xl': 'full' }}>  explicit ramp
+ */
+import type { HTMLAttributes } from 'astro/types';
+import { sprinkles, type Sprinkles } from '../../styles/sprinkles.css';
+
+interface Props extends Omit<HTMLAttributes<'div'>, 'size'> {
+	as?: 'div' | 'section' | 'main' | 'article' | 'header' | 'footer' | 'nav';
+	size?: Sprinkles['maxWidth'];
+	px?: Sprinkles['paddingInline'];
+	py?: Sprinkles['paddingBlock'];
+}
+
+const {
+	as: Tag = 'div',
+	size = 'container',
+	px = { base: 'lg', md: 'xl' },
+	py,
+	class: className,
+	...rest
+} = Astro.props;
+
+const cls = sprinkles({
+	maxWidth: size,
+	marginInline: 'auto',
+	width: '100%',
+	paddingInline: px,
+	paddingBlock: py,
+});
+---
+
+<Tag class:list={[cls, className]} {...rest}>
+	<slot />
+</Tag>

@@ -1,0 +1,46 @@
+---
+title: "Hello, blog"
+description: "First post. A sanity check that math, code, and links render the way they should before any real writing lands here."
+publishedAt: 2026-05-13
+tags: ["meta"]
+math: true
+toc: false
+---
+
+This is the first post on this site. The point of the blog is to keep notes on the problems I run into while building zero-knowledge verifiers small enough to run on $7 microcontrollers, and to use the act of writing as a forcing function to actually understand what I'm doing.
+
+## Math should render, because the pipeline says it does
+
+Pairing-based cryptography lives or dies on bilinearity. For a pairing $e: G_1 \times G_2 \to G_T$ you want, for any points $P_1, P_2 \in G_1$
+and $Q \in G_2$:
+
+$$
+e(P_1 + P_2,\, Q) = e(P_1, Q) \cdot e(P_2, Q)
+$$
+
+Stare at that long enough and Groth16's three-pairing verification stops looking like magic and starts looking like the only thing it could possibly be.
+
+## Code blocks should highlight
+
+Here's the skeleton of a Miller loop, just to give shiki something to
+chew on:
+
+```rust
+fn miller_loop(p: G1Affine, q: G2Affine) -> Fq12 {
+    let mut f = Fq12::ONE;
+    for bit in ATE_LOOP.iter().rev().skip(1) {
+        f.square_assign();
+        line_double(&mut f, p, q);
+        if *bit {
+            line_add(&mut f, p, q);
+        }
+    }
+    f
+}
+```
+
+## What's next
+
+Notes on the BN254 verifier loop, the embedded constraints that shaped the design (no heap, ~520 KB SRAM, single-core Cortex-M33 at 150 MHz), and benchmark logs as I push the cycle count down.
+
+— N

@@ -1,0 +1,125 @@
+---
+/**
+ * Project detail layout. Renders the schema metadata above the MDX content:
+ *   - Header: title, description
+ *   - Meta cluster: period · role · external links
+ *   - Stack chips
+ *   - Metrics grid (label / value+unit / optional note)
+ *   - <slot/> — MDX body, styled by the shared `prose` class
+ */
+import type { CollectionEntry } from 'astro:content';
+import Stack from '../components/primitives/Stack.astro';
+import Cluster from '../components/primitives/Cluster.astro';
+import Grid from '../components/primitives/Grid.astro';
+import WideBand from '../components/primitives/WideBand.astro';
+import { sprinkles } from '../styles/sprinkles.css';
+import { prose } from '../styles/prose.css';
+import * as styles from './styles/ProjectLayout.css';
+
+interface Props {
+	entry: CollectionEntry<'projects'>;
+}
+
+const { entry } = Astro.props;
+const { title, description, role, period, stack, metrics, links } = entry.data;
+
+const MONTHS = [
+	'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+	'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+function formatPart(s: string): string {
+	// 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'
+	const parts = s.split('-');
+	if (parts.length === 1) return parts[0];
+	const m = MONTHS[Number.parseInt(parts[1], 10) - 1];
+	return `${m} ${parts[0]}`;
+}
+
+const periodStr =
+	!period.end ? formatPart(period.start)
+	: period.end === 'ongoing' ? `${formatPart(period.start)} — present`
+	: `${formatPart(period.start)} — ${formatPart(period.end)}`;
+
+const LINK_LABELS: Record<string, string> = {
+	repo: 'Repository',
+	demo: 'Demo',
+	post: 'Post',
+	paper: 'Paper',
+	package: 'Package',
+};
+
+// Flatten the optional links record into a sorted array of present links so
+// the template can do one map without nested member checks.
+const linkRows = (Object.entries(links) as Array<[string, string | undefined]>)
+	.filter((pair): pair is [string, string] => Boolean(pair[1]))
+	.map(([kind, url]) => ({ kind, label: LINK_LABELS[kind] ?? kind, url }));
+
+const titleCls = sprinkles({
+	fontSize: 'h1',
+	fontWeight: 'semibold',
+	letterSpacing: 'tight',
+	lineHeight: 'tight',
+});
+
+const descCls = sprinkles({ fontSize: 'lg', color: 'textMuted' });
+---
+
+<WideBand as="article">
+	<Stack gap="2xl">
+		<header>
+			<Stack gap="lg">
+				<Stack gap="md">
+					<h1 class={titleCls}>{title}</h1>
+					<p class={descCls}>{description}</p>
+				</Stack>
+
+				<Cluster gap="md" class={styles.meta}>
+					<span>{periodStr}</span>
+					{role && <span>· {role}</span>}
+				</Cluster>
+
+				{linkRows.length > 0 && (
+					<Cluster gap="lg">
+						{linkRows.map((row) => (
+							<a
+								href={row.url}
+								class={styles.projectLink}
+								target="_blank"
+								rel="noopener"
+							>
+								{row.label + ' →'}
+							</a>
+						))}
+					</Cluster>
+				)}
+
+				{stack.length > 0 && (
+					<Cluster as="ul" gap="xs" class={styles.list}>
+						{stack.map((tech) => <li class={styles.stackChip}>{tech}</li>)}
+					</Cluster>
+				)}
+			</Stack>
+		</header>
+
+		{metrics.length > 0 && (
+			<Grid cols={{ base: 1, sm: 2, md: 3 }} gap="md">
+				{metrics.map((m) => (
+					<div class={styles.metric}>
+						<Stack gap="2xs">
+							<p class={styles.metricLabel}>{m.label}</p>
+							<p class={styles.metricValue}>
+								{m.unit ? m.value + m.unit : m.value}
+							</p>
+							{m.note && <p class={styles.metricNote}>{m.note}</p>}
+						</Stack>
+					</div>
+				))}
+			</Grid>
+		)}
+
+		<div class={prose}>
+			<slot />
+		</div>
+	</Stack>
+</WideBand>

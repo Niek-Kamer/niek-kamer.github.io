@@ -1,0 +1,33 @@
+# https://lefthook.dev — fast, parallel git hooks
+# Installed locally via `bun install` (prepare script runs `lefthook install`).
+
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: '*.{js,mjs,cjs,ts,tsx,jsx,json,jsonc}'
+      run: bunx biome check --write --no-errors-on-unmatched {staged_files}
+      stage_fixed: true
+    eslint:
+      glob: '*.astro'
+      run: bunx eslint --fix --no-error-on-unmatched-pattern {staged_files}
+      stage_fixed: true
+    # If any Rust token source changed, regenerate tokens.ts and stage the diff.
+    # Incremental cargo build keeps this near-instant after the first compile.
+    tokens-codegen:
+      glob: 'tokens-gen/**/*.rs'
+      run: bun run codegen && git add src/generated/tokens.ts
+
+pre-push:
+  parallel: true
+  commands:
+    typecheck:
+      run: bun run typecheck
+    biome-ci:
+      run: bunx biome check .
+    eslint-ci:
+      run: bunx eslint .
+    tokens-clippy:
+      run: cargo clippy --manifest-path tokens-gen/Cargo.toml --all-targets --quiet -- -D warnings
+    tokens-tests:
+      run: cargo test --manifest-path tokens-gen/Cargo.toml --release --quiet

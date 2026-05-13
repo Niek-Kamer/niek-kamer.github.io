@@ -1,0 +1,17 @@
+---
+title: "About"
+description: "Niek Kamer — engineer in Amsterdam, working on embedded zero-knowledge cryptography and low-level performance."
+---
+
+Engineer based in Amsterdam, working on the kind of low-level systems code that's hard to make fast and hard to make small. Most of my time goes into zero-knowledge cryptography on embedded targets. The part of the proving stack that's typically considered impossible until someone does it anyway.
+
+I came to this from the performance-engineering side: chasing microseconds in driver loops, rearranging memory layouts so they hit the cache the way you'd want, learning the M-profile ISA well enough that the disassembly stops surprising you. That ends up being a useful skillset when you're trying to do BN254 pairings on a $7 part.
+
+## What I work on
+
+- **Zero-knowledge cryptography** — Groth16/BN254 verification, STARKs,
+  pairing math, Poseidon, Semaphore-adjacent tooling.
+- **Embedded Rust** — `no_std`, Cortex-M33 and RISC-V (Hazard3), realtime
+  constraints, hand-tuned crypto kernels.
+- **Performance work** — driver loops, hot paths, memory layout, profiling
+  and disassembly across Rust, Go, Python, and Solidity.

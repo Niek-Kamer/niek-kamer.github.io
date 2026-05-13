@@ -1,0 +1,80 @@
+---
+title: "The SIMD path that was 0.77× scalar"
+description: "How a perf-counter sanity check on Plonky3's AVX-2 packed Goldilocks Poseidon1 surfaced a missing Karatsuba back-port, and the assumption that produced it."
+publishedAt: 2026-05-13
+tags: ["plonky3", "goldilocks", "performance", "poseidon1"]
+math: false
+toc: false
+---
+
+After landing the [NEON canonicalize fix on Poseidon2](/niekkamer/writing/goldilocks-poseidon2-neon-canonicalize/) I had x86 perf counters open anyway, and figured I'd glance at the packed AVX-2 paths for Goldilocks Poseidon1 while I was there. What I found wasn't obvious at all. I just wanted to confirm the packed path was the obvious 2-3× over scalar that you'd expect from going 4-lane.
+
+It came back at 0.77×. So that means the SIMD path was actively slower than the scalar path it was supposed to replace.
+
+## The number I refused to believe
+
+My first three reactions were all "you've mis-benchmarked." Wrong governor. Scalar built with the wrong RUSTFLAGS. The `Criterion` baseline pinned to the wrong sample. I cycled through each, re-ran. The numbers held. Zen 5, `RUSTFLAGS="-C target-feature=+avx2"`, 100k iterations × 3 runs, perf counting `vpmuludq` retires via AMD's `packed_int_op_type.int256_mul`:
+
+| Permutation                                         |   vpmuludq | Cycles | ns/iter | vs scalar |
+| --------------------------------------------------- | ---------: | -----: | ------: | --------: |
+| Poseidon1 width-8 scalar                            | (baseline) |  3 489 |     635 |     1.00× |
+| Poseidon1 width-8 packed AVX-2 (4 lanes)            |  **4 828** | 18 460 |   3 309 | **0.77×** |
+| Poseidon2 width-8 packed AVX-2 (4 lanes, reference) |      1 204 |  9 377 |   1 665 |     1.04× |
+
+Poseidon2 is the reference row here. It is the same field, same lane count, same SIMD ISA. Packed Poseidon1 retires **4×** the `vpmuludq` of packed Poseidon2 on the equivalent permutation shape. That's not a constant-factor difference you can hand-wave; that's the wrong algorithm running.
+
+Before I went chasing code, I wanted to be _sure_ the counter was sampling the path I thought it was. So I derived the expected `vpmuludq` count straight from the algorithm:
+
+```text
+4 initial + 4 terminal full rounds × (8 S-box × 14 + 8 row-dot-product × 32)
++ 22 partial rounds × 74
++ 1 one-shot mds_multiply(m_i) × 256
+= 4 828 ✓
+```
+
+The source-derived count matched the counter exactly. The packed path is doing four thousand eight hundred and twenty-eight packed 64×64 multiplies where it should be doing on the order of twelve hundred.
+
+## Following the multiplies
+
+The `Permutation` impls for `PackedGoldilocksAVX2` (widths 8, 12, 16) all dispatch the MDS step through the generic `apply_circulant` fallback at `mds/src/util.rs:23-26`:
+
+```rust
+impl Permutation<[PackedGoldilocksAVX2; 8]> for MdsMatrixGoldilocks {
+    fn permute(&self, input: [PackedGoldilocksAVX2; 8]) -> [PackedGoldilocksAVX2; 8] {
+        const ROW: [u64; 8] = convert_array(MATRIX_CIRC_MDS_8_SML_ROW);
+        apply_circulant(&ROW, &input)
+    }
+}
+```
+
+The doc comment on `apply_circulant` is, to its credit, very direct about what it is: an O(N²) reference fallback that callers are supposed to specialise away. Scalar Goldilocks did — `SmallConvolveGoldilocks` keeps the small-constant structure (the MDS row for width 8 is `[1, 3, 4, 7, 8, 9, ...]`) and folds the dot products through an `i64 × i128` accumulator. The wide accumulator absorbs eight small multiplies before any modular work, so the scalar path never issues a full Goldilocks multiply for the MDS step.
+
+The packed path crosses that bridge in the wrong direction. `R::from_u64` broadcasts each tiny coefficient into a packed Goldilocks element, the small-constant fact is gone by the next instruction, and every coefficient × state pair issues a full packed Goldilocks multiply through the generic kernel. Six small constants per output × eight outputs × round count, all going through the kernel that doesn't know any of them are small. That's where 4,828 came from.
+
+## How this is even possible
+
+The cleanest explanation is that nobody decided to ship a slow packed path on purpose. PR [#1378](https://github.com/Plonky3/Plonky3/pull/1378) landed specialised Karatsuba MDS paths for Monty31 fields, and in the same wave Goldilocks Poseidon**2** got an analogous packed path. Goldilocks Poseidon**1** was apparently skipped over. So this isn't a designed limitation, it's a missing back-port, and the two ingredients I'd need to write the specialised path are already sitting in the tree:
+
+- `FieldConvolve::conv8` / `conv12` — the same convolve routines the Poseidon2 packed path already uses.
+- `PackedGoldilocksAVX2::halve()` at `packing.rs:130` — the prerequisite for Karatsuba's halving step.
+
+The shape of the fix is mechanical from there: thin `mds_circulant_karatsuba_{8,12}` wrappers in the shared crate plus per-arch `goldilocks/src/{avx2,avx512}/poseidon1.rs` files to hook them into the `Permutation` impls. AVX-512 has the same gap (`x86_64_avx512/mds.rs:20-26`); the 8 lanes absorb more overhead than AVX-2 does but still under-deliver by roughly 1.84× of an 8× lane ceiling. Cycle-budget projection from the Poseidon2 reference puts the AVX-2 packed Poseidon1 fix near a **2× wall-time speedup** over the current path. I'm not going to defend the projection because the actual fix benchmark is the load-bearing number.
+
+## The open scopes I had before I opened the implementation PR
+
+- **Widths.** Default is 8 and 12; width 16 comes via `Poseidon1GoldilocksGeneric`. All three, or just 8 and 12?
+- **Archs.** AVX-2 and AVX-512 share the gap. Single PR for both, or split?
+- **Partial-round path.** `cheap_matmul`'s `A::mixed_dot_product` (`poseidon1/src/internal.rs:163`) is also unspecialised for packed types. Same PR, or follow-up?
+- **Latency-hiding state splits.** `InternalLayer8` / `InternalLayer12` (the Goldilocks analogues of #1378's `InternalLayer16` / `24`) don't exist yet. Worth building, or keep the diff narrow?
+
+## The assumption I wanted to retire
+
+The thing I assumed without checking, and the only reason I noticed any of this, was that the SIMD path was monotonically faster than the scalar path it replaced. It isn't, and the case where it isn't is almost banal in hindsight:
+
+> **A SIMD rewrite is only faster than the scalar baseline if it preserves whatever structure the scalar baseline was exploiting.**
+
+The scalar Goldilocks MDS path leans on three structural facts simultaneously: the MDS coefficients are small enough that an `i64 × i128` accumulator dodges modular reduction; the circulant structure means a Karatsuba decomposition cuts multiply count from O(N²) to O(N^log₂3); and the inputs are canonical so the inner kernel skips a range check. The packed path dispatches through a generic reference kernel that knows none of those things, so the 4× lane count gets spent paying back the structural loss instead of producing any speedup.
+
+Once you state it this way, the heuristic for where else this might be hiding gets concrete: any path where the SIMD impl uses `R::from_u64` or a similarly-generic broadcast on values the scalar impl knew were small; any path where the scalar uses a recursive decomposition and the SIMD just calls the reference; any path where the scalar exploits a precondition the SIMD layer doesn't propagate. Those are three grep-able anti-patterns.
+
+Discussion at [Plonky3#1642](https://github.com/Plonky3/Plonky3/issues/1642). If you've seen the same shape in another Plonky3 packed path, that's where to drop it.

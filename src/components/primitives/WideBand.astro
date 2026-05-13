@@ -1,0 +1,41 @@
+---
+/**
+ * 85ch centered article column. Used in writing/projects detail pages as
+ * the single column for title, description, meta, body, code, and tables.
+ *
+ *   <WideBand as="article">
+ *     <Stack gap="2xl">
+ *       <header>…</header>
+ *       <div class={prose}>…</div>
+ *     </Stack>
+ *   </WideBand>
+ *
+ * Pair with `<ProseBand>` (65ch) for narrower index-style pages.
+ */
+import type { HTMLAttributes } from 'astro/types';
+import { sprinkles } from '../../styles/sprinkles.css';
+
+interface Props extends HTMLAttributes<'div'> {
+	as?:
+		| 'div'
+		| 'section'
+		| 'header'
+		| 'footer'
+		| 'article'
+		| 'main'
+		| 'aside'
+		| 'nav';
+}
+
+const { as: Tag = 'div', class: className, ...rest } = Astro.props;
+
+const cls = sprinkles({
+	maxWidth: 'wide',
+	marginInline: 'auto',
+	width: '100%',
+});
+---
+
+<Tag class:list={[cls, className]} {...rest}>
+	<slot />
+</Tag>

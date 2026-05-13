@@ -1,0 +1,28 @@
+[package]
+name = "tokens-gen"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Source-of-truth design tokens for the portfolio, emitted to TypeScript."
+
+[[bin]]
+name = "tokens-gen"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+# Intentionally zero runtime dependencies. The generator is pure std lib so the
+# build stays instant and the surface stays small.
+
+[lints.clippy]
+# Default `clippy::all` (correctness/suspicious/complexity/perf/style) is on
+# by default at warn level — we additionally opt into pedantic. CI runs clippy
+# with `-D warnings` so any of these will fail the build.
+pedantic = { level = "warn", priority = -1 }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true

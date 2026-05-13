@@ -1,0 +1,35 @@
+---
+import { getCollection, render } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Article from '../../layouts/Article.astro';
+
+export async function getStaticPaths() {
+	// Drafts are excluded in production builds; in dev they show up so you
+	// can preview them while writing.
+	const posts = await getCollection('writing', ({ data }) =>
+		import.meta.env.PROD ? !data.draft : true,
+	);
+
+	return posts.map((post) => ({
+		params: { slug: post.id },
+		props: { post },
+	}));
+}
+
+const { post } = Astro.props;
+const { Content } = await render(post);
+---
+
+<BaseLayout
+	title={post.data.title}
+	description={post.data.description}
+	type="article"
+	canonical={post.data.canonical}
+	publishedAt={post.data.publishedAt}
+	updatedAt={post.data.updatedAt}
+	math={post.data.math}
+>
+	<Article entry={post}>
+		<Content />
+	</Article>
+</BaseLayout>

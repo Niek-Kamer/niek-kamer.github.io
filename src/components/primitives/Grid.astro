@@ -1,0 +1,42 @@
+---
+/**
+ * CSS grid with responsive column counts from the `columns` token scale.
+ *
+ *   <Grid cols={{ base: 1, md: 2, xl: 3 }} gap="lg">…</Grid>
+ */
+import type { HTMLAttributes } from 'astro/types';
+import { sprinkles, type Sprinkles } from '../../styles/sprinkles.css';
+
+interface Props extends HTMLAttributes<'div'> {
+	as?: 'div' | 'section' | 'ul' | 'ol';
+	cols?: Sprinkles['gridTemplateColumns'];
+	gap?: Sprinkles['gap'];
+	rowGap?: Sprinkles['rowGap'];
+	columnGap?: Sprinkles['columnGap'];
+	align?: Sprinkles['alignItems'];
+}
+
+const {
+	as: Tag = 'div',
+	cols = 1,
+	gap = 'md',
+	rowGap,
+	columnGap,
+	align,
+	class: className,
+	...rest
+} = Astro.props;
+
+const cls = sprinkles({
+	display: 'grid',
+	gridTemplateColumns: cols,
+	gap,
+	rowGap,
+	columnGap,
+	alignItems: align,
+});
+---
+
+<Tag class:list={[cls, className]} {...rest}>
+	<slot />
+</Tag>

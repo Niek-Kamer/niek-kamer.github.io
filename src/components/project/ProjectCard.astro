@@ -1,0 +1,42 @@
+---
+/**
+ * One entry in the projects list. Takes a pre-shaped card so the parent loop
+ * stays free of nested map+JSX — Astro's parser doesn't love that.
+ */
+import Stack from '../primitives/Stack.astro';
+import Cluster from '../primitives/Cluster.astro';
+import { sprinkles } from '../../styles/sprinkles.css';
+import * as styles from './styles/ProjectCard.css';
+
+interface Props {
+	card: {
+		href: string;
+		title: string;
+		description: string;
+		period: string;
+		stack: string[];
+		featured: boolean;
+	};
+}
+
+const { card } = Astro.props;
+
+const titleCls = sprinkles({ fontSize: 'xl', fontWeight: 'semibold' });
+const descCls = sprinkles({ color: 'textMuted' });
+---
+
+<a href={card.href} class={styles.link}>
+	<Stack gap="xs">
+		<Cluster gap="sm" align="center">
+			{card.featured && <span class={styles.featuredBadge}>Featured</span>}
+			<span class={styles.period}>{card.period}</span>
+		</Cluster>
+		<h2 class={titleCls}>{card.title}</h2>
+		<p class={descCls}>{card.description}</p>
+		{card.stack.length > 0 && (
+			<Cluster as="ul" gap="xs" class={styles.stackList}>
+				{card.stack.map((tech) => <li class={styles.stackChip}>{tech}</li>)}
+			</Cluster>
+		)}
+	</Stack>
+</a>

@@ -1,0 +1,65 @@
+---
+import Cluster from '../../primitives/Cluster.astro';
+import Container from '../../primitives/Container.astro';
+import Icon from '../../icons/Icon.astro';
+import { sprinkles } from '../../../styles/sprinkles.css';
+import { site } from '../../../data/site';
+import * as styles from './styles/Footer.css';
+
+const year = new Date().getFullYear();
+
+const labelFor: Record<string, string> = {
+	github: 'GitHub',
+	mastodon: 'Mastodon',
+	x: 'X',
+	linkedin: 'LinkedIn',
+	telegram: 'Telegram',
+	email: 'Email',
+	website: 'Website',
+};
+
+// Outer margin on the bordered <footer> so the rule sits below empty space
+// rather than flush against the previous block. Inner padding lives inside
+// the Container so the content has breathing room within the bar.
+const footerMargin = sprinkles({
+	marginBlock: { base: '2xl', xl: '3xl' },
+});
+
+const footerPadding = sprinkles({
+	paddingBlock: { base: 'lg', md: 'xl' },
+});
+
+const socialLink = sprinkles({
+	display: 'inline-flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	color: 'textMuted',
+	borderRadius: 'md',
+	padding: 'xs',
+});
+---
+
+<footer class:list={[footerMargin, styles.footer]}>
+	<Container>
+		<Cluster justify="space-between" align="center" gap="md" class={footerPadding}>
+			<p class={styles.copy}>
+				© {year} {site.author.name} · {site.author.location}
+			</p>
+			<Cluster as="ul" gap="xs" class={styles.socials} aria-label="Elsewhere">
+				{site.author.socials.map((s) => (
+					<li>
+						<a
+							href={s.url}
+							rel={s.platform === 'mastodon' ? 'me noopener' : 'noopener'}
+							target={s.platform === 'email' ? undefined : '_blank'}
+							aria-label={labelFor[s.platform] ?? s.platform}
+							class:list={[socialLink, styles.socialLink]}
+						>
+							<Icon name={s.platform} />
+						</a>
+					</li>
+				))}
+			</Cluster>
+		</Cluster>
+	</Container>
+</footer>

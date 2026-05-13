@@ -1,0 +1,83 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Container from '../../components/primitives/Container.astro';
+import ProseBand from '../../components/primitives/ProseBand.astro';
+import Stack from '../../components/primitives/Stack.astro';
+import ProjectCard from '../../components/project/ProjectCard.astro';
+import { sprinkles } from '../../styles/sprinkles.css';
+import * as styles from './_styles/index.css';
+
+const MONTHS = [
+	'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+	'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+function formatPart(s: string): string {
+	const parts = s.split('-');
+	if (parts.length === 1) return parts[0];
+	const m = MONTHS[Number.parseInt(parts[1], 10) - 1];
+	return `${m} ${parts[0]}`;
+}
+
+const entries = await getCollection('projects', ({ data }) => !data.draft);
+
+// Sort: featured first, then by `order` ascending (so order=0 ends up
+// alongside non-featured), then by period.start descending as a tiebreaker.
+const sorted = entries.sort((a, b) => {
+	if (a.data.featured !== b.data.featured) return a.data.featured ? -1 : 1;
+	if (a.data.order !== b.data.order) return a.data.order - b.data.order;
+	return b.data.period.start.localeCompare(a.data.period.start);
+});
+
+const cards = sorted.map((project) => {
+	const p = project.data.period;
+	const periodStr =
+		!p.end ? formatPart(p.start)
+		: p.end === 'ongoing' ? `${formatPart(p.start)} — present`
+		: `${formatPart(p.start)} — ${formatPart(p.end)}`;
+
+	return {
+		href: `/projects/${project.id}`,
+		title: project.data.title,
+		description: project.data.description,
+		period: periodStr,
+		stack: project.data.stack,
+		featured: project.data.featured,
+	};
+});
+
+const heading = sprinkles({ fontSize: 'h2', fontWeight: 'semibold', letterSpacing: 'tight' });
+const subtitle = sprinkles({ fontSize: 'lg', color: 'textMuted' });
+const emptyText = sprinkles({ color: 'textMuted' });
+---
+
+<BaseLayout
+	title="Projects"
+	description="Things I've built — mostly embedded zero-knowledge cryptography and low-level performance work."
+>
+	<Container>
+		<ProseBand>
+			<Stack as="section" gap="2xl">
+				<Stack gap="md">
+					<h1 class={heading}>Projects</h1>
+					<p class={subtitle}>
+						Things I've built — mostly embedded zero-knowledge cryptography and low-level performance work.
+					</p>
+				</Stack>
+
+				{cards.length === 0 && (
+					<p class={emptyText}>No projects yet — check back soon.</p>
+				)}
+
+				{cards.length > 0 && (
+					<Stack as="ul" gap="xl" class={styles.list}>
+						{cards.map((c) => (
+							<li><ProjectCard card={c} /></li>
+						))}
+					</Stack>
+				)}
+			</Stack>
+		</ProseBand>
+	</Container>
+</BaseLayout>

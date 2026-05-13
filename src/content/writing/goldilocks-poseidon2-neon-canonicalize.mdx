@@ -1,0 +1,112 @@
+---
+title: "The two instructions hiding in every Goldilocks Poseidon2 add"
+description: "How I went from staring at a perf annotate dump to dropping subs/csel from Plonky3's NEON addition kernel — and the small generalisable principle hiding under the diff."
+publishedAt: 2026-05-13
+tags: ["plonky3", "goldilocks", "performance", "poseidon2"]
+math: true
+toc: false
+---
+
+I was profiling Plonky3's Goldilocks Poseidon2 on a Raspberry Pi 5, trying to figure out where the wall-clock seconds in `prove_goldilocks_poseidon2` were actually going. The headline answer was unsurprising, the prove path is FFT and Merkle work, but the _external permute_ kernels (`external_initial_permute_dual_w8`, `external_terminal_permute_dual_w8`) sat in a fat enough position that I scrolled down into them with `perf annotate`, mostly out of curiosity.
+
+What I saw there bothered me.
+
+## The pattern that wouldn't go away
+
+The output of `perf annotate` on the round kernel was, fundamentally, a wall of inline NEON assembly. Most of it I expected: loads, muls, the Goldilocks reduction sequence, more loads. But interleaved through all of it, every few instructions, was the same two-op pair:
+
+```text
+subs   xN, xM, x_p
+csel   xM, xM, xN, hs
+```
+
+A compare against $P$ (Goldilocks's prime, $P = 2^{64} - 2^{32} + 1$), then a conditional select — the canonicalize step:
+
+$$
+b \mapsto \begin{cases} b - P, & b \geq P \\ b, & b < P \end{cases}
+$$
+
+Once or twice would have been fine because every Goldilocks add has to make sure its inputs are in range before reducing. But this pair was showing up _everywhere_. I counted sixteen of them in just the round-constant addition block. Each external round was paying twos of ALU ops, multiplied across every state element, on every iteration.
+
+The story I'd been telling myself was _that's just the cost of being safe against arbitrary inputs_. `add_asm` is a public-ish kernel; it can't assume `b < P` because callers might be feeding it values straight out of a multiply that hasn't fully reduced. The two-instruction canonicalize-b is the price you pay for not corrupting downstream state.
+
+The friction with that story was sitting right there in the line above each `subs/csel`: the operands were _literally being loaded from a round-constant table I had written_.
+
+## The thing I should have seen sooner
+
+Round constants are static. They're a `const GOLDILOCKS_POSEIDON2_RC_*: [u64; N]` array, baked at compile time, never touched by user input. The values are all `< P`. Of course they are — I'd hand-checked them when I wrote the table, and they came out of a paper anyway. Asking the CPU, sixteen times per round, _"is this constant less than P?"_ — when the answer was already typed into the source — felt like a runtime tax on something I knew at compile time.
+
+That was the first crack. The wider question fell out from there: how many _other_ call sites of `add_asm` have a `b` that's provably canonical, even if the language can't tell?
+
+I went through the inline-asm files for the NEON Poseidon2 and classified every `add_asm` call by where its second operand came from. Three buckets came out:
+
+1. **`b` is the output of `add_asm` or `double_asm`.** Both already reduce. There's no path inside the asm sequence that leaves a non-canonical residue. Canonicalization is wasted.
+2. **`b` is a round constant from a `const` table.** Provably canonical from the source, if we can convince ourselves of the precondition.
+3. **`b` is an accumulator initialised to zero.** Zero is trivially `< P`.
+
+Plus the case I _couldn't_ skip:
+
+4. **`b` is a public input to the kernel.** Some of `apply_mat4_asm`'s nine internal sums add `x[i]` directly to a running sum. Those `x[i]`'s come from arbitrary callers; the canonicalize is load-bearing. There's an existing proptest, `test_apply_mat4_asm_danger`, that exercises non-canonical inputs to exactly that contract. Touching those would break it.
+
+So the right shape wasn't to _change_ `add_asm`. It was to introduce a _sibling_ — the same `add_asm`, minus the canonicalize-b pair — and use it only where the precondition holds.
+
+## What I considered and rejected
+
+Before settling on a sibling function, two options seemed cleaner to me on the surface:
+
+- **A const-generic flag on `add_asm` itself**: `add_asm::<{ B_IS_CANONICAL: true }>(a, b)`. This is elegant on paper but ugly in practice — the inline-asm body would need to conditionally emit different instruction sequences via `cfg!` or `if const` shenanigans, and then the call-site noise (`add_asm::<true>` vs `add_asm::<false>`) doesn't actually help readers understand _why_ the precondition holds.
+
+- **A runtime branch inside `add_asm`** that skips the canonicalize when `b < P`. This is hilariously self-defeating because a branch costs more than the two instructions you're trying to save, and the branch predictor has no information to predict it.
+
+A sibling function with a name (`add_canonical_asm`) that _encodes the precondition in its identity_ won out. You can grep for it. You can `pub(super)` it inside `aarch64_neon` so no caller outside the module can violate the precondition. And you can put a `debug_assert!(b < P)` in there so any future change that violates the precondition fails loudly under `cargo test` rather than silently corrupting a proof.
+
+## Proving the precondition
+
+For the round-constant case I needed an actual proof, not just a comment. The fix was a small test:
+
+```rust
+#[test]
+fn test_goldilocks_poseidon2_rc_tables_canonical() {
+    for &c in GOLDILOCKS_POSEIDON2_RC_EXTERNAL.iter() {
+        assert!(c.value < P);
+    }
+    for &c in GOLDILOCKS_POSEIDON2_RC_INTERNAL.iter() {
+        assert!(c.value < P);
+    }
+}
+```
+
+It iterates every round-constant array and asserts canonicality. Anyone editing the tables triggers it on the next `cargo test` so the precondition is mechanically enforced, not vibes-enforced.
+
+For the other two classes, the proof is the inline-asm code itself. Each `add_canonical_asm` call site gets an annotation in source spelling out _why_ `b` is canonical (e.g., `// b: output of add_asm above`), which is cheap, locally checkable, and stays accurate as long as the asm body doesn't drift.
+
+## The diff and the numbers
+
+The actual change ends up being unremarkable: I introduced `add_canonical_asm`, swapped it in at the three classes of sites, and added the round-constant assertion test. Pi 5, Cortex-A76, governor=performance, 5×5 reps, median:
+
+| Benchmark                           |   Before |    After |           Δ |
+| ----------------------------------- | -------: | -------: | ----------: |
+| `prove_goldilocks_poseidon2` (e2e)  | 124.18 s | 120.54 s | **−2.93 %** |
+| `external_terminal_permute_dual_w8` |    3 434 |    3 231 | **−5.91 %** |
+| `external_initial_permute_dual_w8`  |    3 617 |    3 392 | **−6.21 %** |
+
+The kernel-level deltas dilute into the e2e number because most of `prove_goldilocks_poseidon2`'s wall-time is FFT and Merkle work this doesn't touch.
+
+## The pattern that I found worth keeping
+
+The instruction trim itself was tiny and field-specific — it only mattered because Goldilocks had a fast enough reduction that two ALU ops per add showed up on the Cortex-A76 cycle counter. On a heavier field the multiply dominates and you wouldn't notice.
+
+What I wanted to remember from this is the small generalisable principle:
+
+> **If you can prove an invariant somewhere cheaper than runtime, you can drop the runtime check.**
+
+The cheaper place might be:
+
+- **The type system** — a `Canonical<F>` wrapper that nothing can construct except via reduction.
+- **A const-table assertion** at test time, like the round-constant check above.
+- **Local code-shape annotations** at the call site, when the producer is two lines up and visibly canonicalising.
+- **A property test** that exercises the contract, like `test_apply_mat4_asm_danger`, so a future regression fails loudly.
+
+The trick is being honest about _where_ the proof lives. When I say a call site is "safe", I should have been able to point at the exact thing that makes it safe. The diff was twenty lines; the principle is reusable.
+
+Full diff and benchmark transcript: [Plonky3#1623](https://github.com/Plonky3/Plonky3/pull/1623).

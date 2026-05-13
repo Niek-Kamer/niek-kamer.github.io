@@ -1,0 +1,39 @@
+---
+title: "zkmcu"
+description: "A no_std Rust Groth16/BN254 verifier that runs on a $7 RP2350 microcontroller in ~1 second."
+role: "Author"
+period:
+  start: "2024-08"
+  end: "ongoing"
+stack: ["Rust", "no_std", "Cortex-M33", "RP2350", "BN254", "Groth16"]
+metrics:
+  - label: "Verify time"
+    value: 1
+    unit: "s"
+    note: "on RP2350 @ 150 MHz"
+  - label: "Hardware cost"
+    value: "$7"
+  - label: "Target SRAM"
+    value: 520
+    unit: "KB"
+    note: "available, no heap"
+links:
+  repo: "https://github.com/Niek-Kamer/zkmcu"
+  demo: "https://zkmcu.dev/"
+featured: true
+order: 1
+---
+
+## What it is
+
+A from-scratch zero-knowledge proof verifier targeting microcontrollers that would normally be considered far too small for the job. zkmcu verifies Groth16 proofs over the BN254 curve in roughly one second on an RP2350, a $7 dual-core Cortex-M33 chip with 520 KB of SRAM and no heap.
+
+## Why it exists
+
+ZK verification on-device is the unglamorous half of the proving stack. Most of the literature points at GPUs or x86 servers. Pushing it into the $7 microcontroller envelope opens up a long tail of use cases: sensor attestation, hardware wallets without an HSM, "verifier in a sticker" places where running a real curve operation locally beats trusting a remote service to do the math for you.
+
+## How it works
+
+The verifier is `no_std` and avoids heap allocation entirely. Montgomery multiplication, Frobenius endomorphisms, and the final exponentiation are unrolled by hand for the M33 instruction set, and the BN254 line functions are templated to keep the per-pairing constants in flash rather than SRAM.
+
+Read the full writeup at [zkmcu.dev](https://zkmcu.dev/).

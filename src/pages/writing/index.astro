@@ -1,0 +1,64 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Container from '../../components/primitives/Container.astro';
+import ProseBand from '../../components/primitives/ProseBand.astro';
+import Stack from '../../components/primitives/Stack.astro';
+import PostCard from '../../components/writing/PostCard.astro';
+import { sprinkles } from '../../styles/sprinkles.css';
+import * as styles from './_styles/index.css';
+
+const entries = await getCollection('writing', ({ data }) => !data.draft);
+const sorted = entries.sort(
+	(a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime(),
+);
+
+const formatter = new Intl.DateTimeFormat('en', {
+	year: 'numeric',
+	month: 'short',
+	day: 'numeric',
+});
+
+const cards = sorted.map((post) => ({
+	href: `/writing/${post.id}`,
+	iso: post.data.publishedAt.toISOString(),
+	date: formatter.format(post.data.publishedAt),
+	title: post.data.title,
+	description: post.data.description,
+	hashTags: post.data.tags.map((t) => `#${t}`),
+}));
+
+const heading = sprinkles({ fontSize: 'h2', fontWeight: 'semibold', letterSpacing: 'tight' });
+const subtitle = sprinkles({ fontSize: 'lg', color: 'textMuted' });
+const emptyText = sprinkles({ color: 'textMuted' });
+---
+
+<BaseLayout
+	title="Writing"
+	description="Notes on zero-knowledge cryptography, embedded Rust, and the gap between them."
+>
+	<Container>
+		<ProseBand>
+			<Stack as="section" gap="2xl">
+				<Stack gap="md">
+					<h1 class={heading}>Writing</h1>
+					<p class={subtitle}>
+						Notes on zero-knowledge cryptography, embedded Rust, and the gap between them.
+					</p>
+				</Stack>
+
+				{cards.length === 0 && (
+					<p class={emptyText}>No posts yet — check back soon.</p>
+				)}
+
+				{cards.length > 0 && (
+					<Stack as="ul" gap="xl" class={styles.list}>
+						{cards.map((c) => (
+							<li><PostCard card={c} /></li>
+						))}
+					</Stack>
+				)}
+			</Stack>
+		</ProseBand>
+	</Container>
+</BaseLayout>

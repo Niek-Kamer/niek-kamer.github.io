@@ -1,0 +1,38 @@
+---
+/**
+ * Vertical flow with token-based gap.
+ *
+ *   <Stack gap="md">…</Stack>
+ *   <Stack gap={{ base: 'sm', md: 'lg' }}>…</Stack>
+ */
+import type { HTMLAttributes } from 'astro/types';
+import { sprinkles, type Sprinkles } from '../../styles/sprinkles.css';
+
+interface Props extends HTMLAttributes<'div'> {
+	as?: 'div' | 'section' | 'article' | 'nav' | 'ul' | 'ol';
+	gap?: Sprinkles['gap'];
+	align?: Sprinkles['alignItems'];
+	justify?: Sprinkles['justifyContent'];
+}
+
+const {
+	as: Tag = 'div',
+	gap = 'md',
+	align,
+	justify,
+	class: className,
+	...rest
+} = Astro.props;
+
+const cls = sprinkles({
+	display: 'flex',
+	flexDirection: 'column',
+	gap,
+	alignItems: align,
+	justifyContent: justify,
+});
+---
+
+<Tag class:list={[cls, className]} {...rest}>
+	<slot />
+</Tag>

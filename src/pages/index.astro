@@ -1,0 +1,75 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Sidebar from '../components/primitives/Sidebar.astro';
+import Stack from '../components/primitives/Stack.astro';
+import Cluster from '../components/primitives/Cluster.astro';
+import { sprinkles } from '../styles/sprinkles.css';
+import { site } from '../data/site';
+import * as styles from './_styles/index.css';
+
+const heading = sprinkles({
+	fontSize: 'display',
+	fontWeight: 'semibold',
+	letterSpacing: 'tight',
+	lineHeight: 'tight',
+});
+
+const subtitle = sprinkles({
+	fontSize: 'lg',
+	color: 'textMuted',
+});
+
+const bio = sprinkles({
+	fontSize: 'body',
+	lineHeight: 'relaxed',
+});
+
+const cardInner = sprinkles({
+	padding: 'lg',
+	borderRadius: 'md',
+});
+
+const sideText = sprinkles({
+	fontSize: 'sm',
+	lineHeight: 'snug',
+	color: 'textMuted',
+});
+
+const cardTitle = sprinkles({
+	fontSize: 'lg',
+	fontWeight: 'semibold',
+});
+---
+
+<BaseLayout>
+	<Sidebar at="md" sideWidth="narrow" gap="2xl">
+		<Stack slot="content" gap="lg">
+			<h1 class={heading}>{site.author.name}</h1>
+			<p class={subtitle}>{site.author.location}</p>
+			<p class={bio}>{site.author.bio}</p>
+			<Cluster gap="lg">
+				<a href="/writing" class={styles.cta}>Read writing →</a>
+				<a href="/projects" class={styles.cta}>See projects →</a>
+			</Cluster>
+		</Stack>
+
+		<Stack slot="side" gap="xl">
+			<Stack gap="xs">
+				<p class={styles.sideLabel}>Now</p>
+				<p class={sideText}>{site.now}</p>
+			</Stack>
+
+			{site.featured.map((project) => (
+				<a href={project.url} class={styles.featuredCard}>
+					<div class={cardInner}>
+						<Stack gap="xs">
+							{project.label && <span class={styles.sideLabel}>{project.label}</span>}
+							<h2 class={cardTitle}>{project.name}</h2>
+							<p class={sideText}>{project.summary}</p>
+						</Stack>
+					</div>
+				</a>
+			))}
+		</Stack>
+	</Sidebar>
+</BaseLayout>
