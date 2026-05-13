@@ -6,12 +6,12 @@ import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
 import { defineConfig } from 'astro/config';
 import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
-
+import zkmcuDarkRaw from './src/styles/themes/zkmcu-dark.json' with { type: 'json' };
 // VS Code theme JSON files (with `tokenColors` instead of `settings`).
 // Shiki accepts this format at runtime but its TS type insists on `settings`,
 // so we cast each import — same JSON, just bypassing a type-narrowness bug.
 import zkmcuLightRaw from './src/styles/themes/zkmcu-light.json' with { type: 'json' };
-import zkmcuDarkRaw from './src/styles/themes/zkmcu-dark.json' with { type: 'json' };
+
 /** @type {import('shiki').ThemeRegistrationRaw} */
 const zkmcuLight = /** @type {any} */ (zkmcuLightRaw);
 /** @type {import('shiki').ThemeRegistrationRaw} */

@@ -154,8 +154,7 @@ const sharedTokens = {
 		// Fraunces variable handles both display and body via the `opsz` optical-size
 		// axis (set globally with `font-optical-sizing: auto`). Using one family for
 		// the whole site keeps the editorial feel tight; weight is the differentiator.
-		display:
-			'"Fraunces Variable", Fraunces, Georgia, "Times New Roman", Times, serif',
+		display: '"Fraunces Variable", Fraunces, Georgia, "Times New Roman", Times, serif',
 		sans: '"Fraunces Variable", Fraunces, Georgia, "Times New Roman", Times, serif',
 		mono: '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
 	},

@@ -30,12 +30,7 @@
 		},
 		{
 			"name": "String (soft green for instant role recognition)",
-			"scope": [
-				"string",
-				"string.quoted",
-				"string.unquoted",
-				"string.template"
-			],
+			"scope": ["string", "string.quoted", "string.unquoted", "string.template"],
 			"settings": {
 				"foreground": "#a3d090"
 			}
@@ -90,23 +85,14 @@
 		},
 		{
 			"name": "Other named constants",
-			"scope": [
-				"constant.other",
-				"variable.other.constant",
-				"entity.name.constant"
-			],
+			"scope": ["constant.other", "variable.other.constant", "entity.name.constant"],
 			"settings": {
 				"foreground": "#fdba74"
 			}
 		},
 		{
 			"name": "Keyword (control flow, declarations) — strongest brand accent",
-			"scope": [
-				"keyword",
-				"keyword.control",
-				"keyword.other",
-				"keyword.declaration"
-			],
+			"scope": ["keyword", "keyword.control", "keyword.other", "keyword.declaration"],
 			"settings": {
 				"foreground": "#f2ceae",
 				"fontStyle": ""
@@ -185,12 +171,7 @@
 		},
 		{
 			"name": "Variable / parameter / identifier (base text)",
-			"scope": [
-				"variable",
-				"variable.other",
-				"variable.parameter",
-				"variable.language"
-			],
+			"scope": ["variable", "variable.other", "variable.parameter", "variable.language"],
 			"settings": {
 				"foreground": "#d8d1c5"
 			}
@@ -312,10 +293,7 @@
 		},
 		{
 			"name": "JSX / HTML attribute name",
-			"scope": [
-				"entity.other.attribute-name.html",
-				"entity.other.attribute-name.jsx"
-			],
+			"scope": ["entity.other.attribute-name.html", "entity.other.attribute-name.jsx"],
 			"settings": {
 				"foreground": "#cb997e"
 			}

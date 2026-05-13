@@ -133,11 +133,9 @@ globalStyle(`${prose} tbody tr`, {
 globalStyle(`${prose} tbody tr:hover`, {
 	backgroundColor: `color-mix(in srgb, ${vars.color.accent} 7%, transparent)`,
 });
-globalStyle(
-	`[data-theme="dark"] ${prose} table strong, [data-theme="dark"] ${prose} table b`,
-	{ color: vars.color.accentWarm },
-);
-globalStyle(
-	`[data-theme="light"] ${prose} table strong, [data-theme="light"] ${prose} table b`,
-	{ color: vars.color.accent },
-);
+globalStyle(`[data-theme="dark"] ${prose} table strong, [data-theme="dark"] ${prose} table b`, {
+	color: vars.color.accentWarm,
+});
+globalStyle(`[data-theme="light"] ${prose} table strong, [data-theme="light"] ${prose} table b`, {
+	color: vars.color.accent,
+});
