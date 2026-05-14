@@ -18,13 +18,11 @@ const zkmcuLight = /** @type {any} */ (zkmcuLightRaw);
 const zkmcuDark = /** @type {any} */ (zkmcuDarkRaw);
 
 // `site` is required for absolute URLs in the sitemap and RSS feed. Mirror
-// the value in src/data/site.ts.
-// `base` matches the repo name — this site is deployed as a GitHub *project*
-// page at https://niek-kamer.github.io/niekkamer/, not as the user site.
+// the value in src/data/site.ts. Deployed as a GitHub *user* site at the
+// apex `https://niek-kamer.github.io/`, so no `base` is needed.
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://niek-kamer.github.io',
-	base: '/niekkamer/',
 	integrations: [
 		mdx(),
 		sitemap({

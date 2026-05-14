@@ -24,8 +24,25 @@ const {
 } = Astro.props;
 
 const pageTitle = title ? `${title} — ${site.name}` : site.title;
+// `Astro.url.pathname` already includes the configured `base`, so the canonical
+// host + path is well-formed. For asset URLs we prefix `BASE_URL` ourselves
+// because raw `/foo.png` hrefs in <head> are not rewritten by Astro.
+const base = import.meta.env.BASE_URL;
+const asset = (path: string) => `${base}${path.replace(/^\//, '')}`;
 const canonicalUrl = canonical ?? new URL(Astro.url.pathname, site.url).toString();
-const imageUrl = new URL(image, site.url).toString();
+const imageUrl = new URL(asset(image), site.url).toString();
+
+const personLd = {
+	'@context': 'https://schema.org',
+	'@type': 'Person',
+	name: site.author.name,
+	url: site.url,
+	jobTitle: 'Cryptography & performance engineer',
+	description: site.author.bio,
+	sameAs: site.author.socials
+		.filter((s) => s.platform !== 'email')
+		.map((s) => s.url),
+};
 ---
 
 <meta charset="utf-8" />
@@ -37,12 +54,16 @@ const imageUrl = new URL(image, site.url).toString();
 <link rel="canonical" href={canonicalUrl} />
 {noindex && <meta name="robots" content="noindex,nofollow" />}
 
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="icon" type="image/x-icon" href={asset('favicon.ico')} sizes="any" />
+<link rel="icon" type="image/png" sizes="32x32" href={asset('favicon-32x32.png')} />
+<link rel="icon" type="image/png" sizes="16x16" href={asset('favicon-16x16.png')} />
+<link rel="apple-touch-icon" sizes="180x180" href={asset('apple-touch-icon.png')} />
+<link rel="manifest" href={asset('site.webmanifest')} />
 <link
 	rel="alternate"
 	type="application/rss+xml"
 	title={`${site.name} — Writing`}
-	href="/writing/rss.xml"
+	href={asset('writing/rss.xml')}
 />
 
 <meta property="og:type" content={type} />
@@ -65,8 +86,11 @@ const imageUrl = new URL(image, site.url).toString();
 	<meta property="article:modified_time" content={updatedAt.toISOString()} />
 )}
 
+<meta name="author" content={site.author.name} />
 <meta name="color-scheme" content="light dark" />
 <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)" />
+
+<script is:inline type="application/ld+json" set:html={JSON.stringify(personLd)} />
 
 <slot />
