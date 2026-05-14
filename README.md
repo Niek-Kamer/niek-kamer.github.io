@@ -1,9 +1,8 @@
-# niekkamer
+# Niek Kamer - Personal Portfolio
 
 Personal portfolio and writing. Embedded ZK, low-level Rust performance,
-Plonky3 / Goldilocks writeups.
 
-Live at https://niek-kamer.github.io/niekkamer/.
+Live at https://niek-kamer.github.io/.
 
 ## Stack
 
