@@ -48,7 +48,10 @@ export const GET: APIRoute = async ({ params }) => {
 		metric,
 	});
 
-	return new Response(png, {
+	// Wrap as Buffer so the Response BodyInit type accepts it cleanly. The
+	// raw Uint8Array from resvg carries a generic `ArrayBufferLike` param
+	// that newer TS narrows away from BodyInit's union.
+	return new Response(Buffer.from(png), {
 		headers: {
 			'Content-Type': 'image/png',
 			'Cache-Control': 'public, max-age=31536000, immutable',
