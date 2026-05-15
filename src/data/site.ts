@@ -68,7 +68,7 @@ export const site: SiteConfig = {
 	author: {
 		name: 'Niek Kamer',
 		location: 'Amsterdam, NL',
-		bio: "Zero-knowledge cryptography on hardware that's too small or too slow to be taken seriously.",
+		bio: "Zero-knowledge cryptography on hardware that's too small or too slow to be taken seriously. Turns out the hardware can usually be persuaded.",
 		socials: [
 			{ platform: 'github', url: 'https://github.com/Niek-Kamer', handle: '@Niek-Kamer' },
 			{ platform: 'x', url: 'https://x.com/Niek0105', handle: '@Niek0105' },
