@@ -1,0 +1,41 @@
+---
+title: "Plonky3 Goldilocks performance"
+description: "Perf-counter-driven contributions to Plonky3's Goldilocks Poseidon paths on aarch64 NEON and x86 AVX — measured speedups, methodology write-ups, one audit that triggered a same-day upstream fix."
+role: "Contributor"
+period:
+  start: "2026-04"
+  end: "ongoing"
+stack: ["Rust", "aarch64 NEON", "AVX-2", "AVX-512", "Plonky3", "perf-counter analysis"]
+metrics:
+  - label: "Poseidon2 e2e prove"
+    value: "−2.93%"
+    note: "Goldilocks NEON · PR #1623 (merged)"
+  - label: "Merkle wall time"
+    value: "−16.4%"
+    note: "Goldilocks NEON · PR #1656 (in review)"
+  - label: "AVX Poseidon1 speedup"
+    value: "1.20×"
+    note: "audit → @Nashtare #1645 (merged)"
+links:
+  repo: "https://github.com/Plonky3/Plonky3"
+featured: true
+order: 2
+---
+
+## What this is
+
+The performance track of my [zkmcu](/projects/zkmcu) work. zkmcu's deployment shape is _prove on a Raspberry Pi 5 (Cortex-A76 NEON), verify on a Pico 2 (Cortex-M33)_, which means the Pi 5 prover side has to be fast or the whole pipeline isn't useful. [Plonky3](https://github.com/Plonky3/Plonky3) is the proving system underneath, and Goldilocks Poseidon2 is the hot path on both halves — so I've been doing perf-counter surveys of its Goldilocks kernels and submitting fixes upstream.
+
+## Shipped contributions
+
+**[Plonky3 PR #1623](https://github.com/Plonky3/Plonky3/pull/1623) — `add_canonical_asm` (merged).** Introduced a variant of the NEON Goldilocks addition kernel that skips the canonicalize-b `subs/csel` pair where the caller can statically guarantee `b < P`. Applied at three classes of provably-canonical call sites in the Poseidon2 NEON inline-asm: matrix-step internal sums, MDS accumulators, and round-constant additions (with a mechanical test asserting every constant in the round-constant tables is canonical). −2.93% end-to-end on `prove_goldilocks_poseidon2`; −5.91% / −6.21% on the external permute kernels. Write-up: [The two instructions hiding in every Goldilocks Poseidon2 add](/writing/goldilocks-poseidon2-neon-canonicalize).
+
+**[Plonky3 #1642 → #1645](https://github.com/Plonky3/Plonky3/issues/1642) — packed-AVX-2 Poseidon1 audit.** Perf-counter survey on Zen 5 found that `Permutation<[PackedGoldilocksAVX2; N]>` was running at 0.77× scalar — actively _slower_ than the scalar path it was supposed to replace, because the MDS step dispatched through the generic `apply_circulant` fallback instead of the Karatsuba specialisation that the scalar path used. Filed as Issue #1642 with the counter trace and source-derived expected-multiply count. [@Nashtare](https://github.com/Nashtare) shipped the fix in [#1645](https://github.com/Plonky3/Plonky3/pull/1645) same-day; post-merge ratio is 0.93× scalar, a 1.20× wall-time delta on the packed permutation. AVX-512 same gap, same fix. Write-up: [The SIMD path that was 0.77× scalar](/writing/goldilocks-poseidon1-avx-mds-fallback).
+
+**[Plonky3 PR #1656](https://github.com/Plonky3/Plonky3/pull/1656) — packed-NEON Poseidon2 dispatch (in review).** Discovered via the Pi 5 Merkle workload survey: `Poseidon2GoldilocksFused<8>`'s packed-type `Permutation` impl was running ~16% slower than the platform-generic Poseidon2 SIMD path on Merkle commit, despite winning per-permute microbenchmarks by 3.5%. Phase decomposition reconciled the two: out-of-order overlap masked the structural per-phase gap in the per-permute benchmark, but Merkle's layer-wise data-dependency chain removed the OoO mask. Routed the packed dispatch through generic; 16.37% Merkle wall-time reduction at log2 leaves ∈ {14, 16, 18} on Pi 5 Cortex-A76. Write-up: [The Poseidon2 regression my microbenchmark told me wasn't there](/writing/goldilocks-poseidon2-merkle-vs-microbench).
+
+## How I work
+
+Every contribution starts with a measurement, not an idea. The pattern across all three is: open `perf annotate` (or `cargo bench` + counter sampling) on a real workload, look for the line that doesn't match what the algorithm should be doing, and confirm the gap with a phase-decomposition harness before touching code. The write-ups document the reasoning chain so the next person doing the same survey doesn't have to start from scratch.
+
+Cost framing per contribution is on each writing post's _shipped impact_ section.

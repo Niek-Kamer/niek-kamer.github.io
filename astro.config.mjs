@@ -6,6 +6,7 @@ import { vanillaExtractPlugin } from '@vanilla-extract/vite-plugin';
 import { defineConfig } from 'astro/config';
 import rehypeKatex from 'rehype-katex';
 import remarkMath from 'remark-math';
+import { rehypeWrapTables } from './src/lib/rehype-wrap-tables';
 import zkmcuDarkRaw from './src/styles/themes/zkmcu-dark.json' with { type: 'json' };
 // VS Code theme JSON files (with `tokenColors` instead of `settings`).
 // Shiki accepts this format at runtime but its TS type insists on `settings`,
@@ -32,7 +33,7 @@ export default defineConfig({
 	],
 	markdown: {
 		remarkPlugins: [remarkMath],
-		rehypePlugins: [rehypeKatex],
+		rehypePlugins: [rehypeKatex, rehypeWrapTables],
 		// Dual-theme code highlighting. `defaultColor: false` makes Shiki emit
 		// both palettes as CSS variables (`--shiki-light`/`--shiki-light-bg`
 		// and `--shiki-dark`/`--shiki-dark-bg`) instead of inlining one as

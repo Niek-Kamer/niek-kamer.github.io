@@ -1,0 +1,193 @@
+---
+title: "The Poseidon2 regression my microbenchmark told me wasn't there"
+description: "A 3.5% per-permute win on Pi 5 hid a 16% Merkle wall-time loss in Plonky3's Goldilocks Poseidon2. Same kernels, same hardware. How phase decomposition reconciled the two."
+publishedAt: 2026-05-15
+tags:
+  [
+    "plonky3",
+    "goldilocks",
+    "performance",
+    "poseidon2",
+    "aarch64",
+    "neon",
+    "benchmarking",
+  ]
+math: true
+toc: false
+headlineMetric:
+  label: "Merkle wall time"
+  value: "−16.4%"
+---
+
+import ShippedImpactCard from "../../components/writing/ShippedImpactCard.astro";
+import ShippedImpactDetail from "../../components/writing/ShippedImpactDetail.astro";
+
+<ShippedImpactCard
+  headline="16.37% Merkle wall-time reduction on aarch64 NEON"
+  hardware="Pi 5 Cortex-A76 · n=25 per cell"
+  scope="Plonky3 PR #1656"
+  detailHref="#shipped-impact"
+/>
+
+I'm building a zkmcu pipeline. Prove on Raspberry Pi 5 (Cortex-A76 NEON), verify on a Pico 2 (Cortex-M33). Goldilocks Poseidon2 sits on both halves of that pipeline, so I've been doing a Pi 5 perf survey of Plonky3's Goldilocks Poseidon2 implementation. The [latest in a series](/projects/plonky3-goldilocks-perf) that started with the [`add_canonical_asm` work](/writing/goldilocks-poseidon2-neon-canonicalize) a couple of weeks ago.
+
+The survey turned up something I couldn't reconcile.
+
+I built a Merkle workload harness for width-8 Goldilocks Poseidon2, $\log_2$ leaves $\in \{14, 16, 18\}$, five seeds, five reps each. Plonky3 has two paths that land at the same kernel on aarch64: `Poseidon2GoldilocksFused<8>`'s packed-type `Permutation` impl (the NEON-tuned `_dual_w8` pipeline) and the platform-generic `Poseidon2` wrapping the same constants. Same hardware, same inputs, same constants. On the Merkle workload, the fused path came out **~16.4% slower**.
+
+Fine. A real regression, I had a Plonky3 PR shape in mind already.
+
+Except earlier in the same survey I'd run a per-permute microbenchmark. Single contiguous loop, one million iterations, no Merkle layer chain. On _that_ benchmark, the fused path **won by 3.5%**.
+
+Both numbers were stable across seeds. Neither was a measurement bug. The contradiction is the most interesting thing I've stared at this month, so the rest of this post is about what was going on. The fix itself is one line, and it's in [Plonky3 PR #1656](https://github.com/Plonky3/Plonky3/pull/1656).
+
+<details open>
+<summary>**How I noticed it**</summary>
+
+The harness lives in `goldilocks/examples/poseidon2_merkle_workload.rs`. It builds a Merkle tree at the chosen leaf count from a deterministic-seed RNG, times `fused.permute_mut(state)` against `generic.permute_mut(state)` over the full tree commit, and reports `fused / generic` ratios per rep. Pi 5, `taskset -c 0`, `cpufreq` governor set to performance, `perf_event_paranoid = 1`. Five seeds × five reps = 25 measurements per cell.
+
+The numbers: pre fused (baseline) vs post fused (the wrapper delegating to generic), measured in separate runs of the same harness:
+
+| $\log_2$ leaves | pre fused (ms, mean ± SD) | post fused (ms, mean ± SD) | reduction |
+| --------------: | ------------------------: | -------------------------: | --------: |
+|              14 |            73.964 ± 0.053 |             61.852 ± 0.255 |    16.38% |
+|              16 |           296.070 ± 0.100 |            247.616 ± 0.229 |    16.37% |
+|              18 |          1183.927 ± 1.184 |            990.154 ± 0.732 |    16.37% |
+
+Three logs, three reductions all within 0.01 percentage points of each other. That kind of cross-scale stability is the strongest "this is structural, not noise" signal a perf survey can throw off, meaning a measurement artifact would have drifted with leaf count. Within-run sanity check: post-fix the fused / generic ratio collapses to $1.001 \pm 0.002$ across 25 reps. The wrapper is doing exactly what generic does.
+
+I had a PR shape in mind already: route the packed dispatch through the generic Poseidon2 so the fused struct stops carrying its own `_dual_w8` pipeline on the packed type. One-liner change in `permute_mut`.
+
+But I also had per-permute numbers from earlier in the survey, and they pointed the opposite way. So before opening a PR, I wanted to understand which benchmark was right.
+
+</details>
+
+<details>
+<summary>**Phase decomposition: where the disagreement came from**</summary>
+
+I have a separate harness, `poseidon2_phase_decomp`, that I wrote when investigating the canonicalize work. It does two things in the same run:
+
+1. Times each of the three Poseidon2 phases in isolation: `external_initial`, `internal`, `external_terminal`. So for both the fused `_dual_w8` kernel and the platform-generic SIMD path. Per-million-iteration averages.
+2. Times the **whole permute** twice: once as a single contiguous loop (`natural`), once with the phases run separately and times summed (`decomp`).
+
+The per-phase numbers were unambiguous: fused loses on all three.
+
+| phase                         | fused ns | generic ns | $\Delta$ ns | $\Delta$ % |
+| ----------------------------- | -------: | ---------: | ----------: | ---------: |
+| ext-init                      |  1406.78 |    1372.79 |      +33.99 |     +2.48% |
+| internal                      |  1733.21 |    1524.54 |     +208.67 |    +13.69% |
+| ext-term                      |  1337.87 |    1294.73 |      +43.15 |     +3.33% |
+| unpack + pack (fused only)    |        — |          — |      +14.69 |          — |
+| **predicted per-permute gap** |          |            | **+300.50** |            |
+
+Internal-rounds dominates as you can see 208.67 of the 300.50 ns gap, ~70%. The fused `_dual_w8` internal-permute kernel runs **13.69% slower** than the generic SIMD path on this shape. (Worth noting: `_dual_w8` is the 2-lane interleaved variant. It's distinct from the single-lane `_w8` powering the scalar verifier `Permutation<[Goldilocks; 8]>`, which is untouched by this work and remains the fastest path for that shape.)
+
+Now the reveal. The same harness's whole-permute table:
+
+| variant                          | fused ns | generic ns | fused/generic |
+| -------------------------------- | -------: | ---------: | ------------: |
+| decomp (per-phase, then summed)  |  4491.92 |    4193.14 |       $1.071$ |
+| natural (single contiguous loop) |  4040.13 |    4187.71 |       $0.965$ |
+
+In the **decomp** variant, fused is +298.78 ns slower, even within 2 ns of the +300.50 prediction from summing the per-phase deltas. The instrumentation reconciles cleanly. (Sanity check from the same run: per-phase sum ÷ decomposed whole-permute = 1.000× for both fused and generic.)
+
+In the **natural** variant, the result inverts. Fused gains 11.18% from running phases in a contiguous loop instead of in isolation; generic gains 0.13%. Net: fused finishes the whole permute 3.5% _faster_ than generic.
+
+Why the difference? The decomp variant deliberately suppresses cross-phase out-of-order overlap by separating each phase into its own instrumented call. The natural variant lets the OoO engine do its job, it can interleave the tail of `ext_init`'s computation with the head of `internal`'s loads, and so on through the pipeline. Fused has more parallelisable latency per phase to hide; generic is already tight enough per phase that there's nothing for OoO to chew on. So fused wins the per-permute race.
+
+Then comes Merkle.
+
+A Merkle tree commit chains permutes through the layer reduction: the hash of layer $L$ feeds directly into the hash of layer $L+1$. That dependency chain serialises permutes so the OoO engine can no longer reorder across them, because the input to permute $k+1$ isn't available until permute $k$ retires. Fused's 11.18% OoO overlap, the thing that made it win per-permute, evaporates. What's left is the +300 ns per-phase structural gap. Multiplied across every layer of the tree.
+
+Which is exactly what the 16.37% reduction-if-generic across all three leaf counts said.
+
+What I want to remember from this is the shape thing. Different benchmark shapes exercise different microarchitectural features, and the per-permute microbenchmark I'd written first was leaning on out-of-order overlap between phases. Fused has more parallelisable latency for the OoO engine to chew on per phase, so fused wins that race. A Merkle commit chains permutes through the layer reduction, which kills the overlap. With no overlap to hide behind, fused's per-phase gap shows up unfiltered, and that's the 16.4%. The microbenchmark wasn't wrong about per-permute throughput. It just wasn't measuring what Merkle stresses.
+
+</details>
+
+<details>
+<summary>**The `#[inline]` gotcha**</summary>
+
+The fix, having understood the above, is one line. Route the packed-type `Permutation` impl through the generic Poseidon2 that we already construct from the same constants:
+
+```rust
+// Before
+impl Permutation<[PackedGoldilocksNeon; 8]> for Poseidon2GoldilocksFused<8> {
+    fn permute_mut(&self, state: &mut [PackedGoldilocksNeon; 8]) {
+        let (mut lane0, mut lane1) = unpack_lanes(state);
+        external_initial_permute_dual_w8(&mut lane0, &mut lane1, &self.initial_constants_raw);
+        internal_permute_split_dual_w8 (&mut lane0, &mut lane1, &self.internal_constants_raw);
+        external_terminal_permute_dual_w8(&mut lane0, &mut lane1, &self.terminal_constants_raw);
+        pack_lanes(state, &lane0, &lane1);
+    }
+}
+
+// After
+impl Permutation<[PackedGoldilocksNeon; 8]> for Poseidon2GoldilocksFused<8> {
+    #[inline]
+    fn permute_mut(&self, state: &mut [PackedGoldilocksNeon; 8]) {
+        self.generic.permute_mut(state);
+    }
+}
+```
+
+When I first applied this without the `#[inline]`, the Merkle gap closed _most_ of the way but a residual 7%-ish gap remained. Same-run fused vs generic ratio at three leaf counts:
+
+| $\log_2$ | fused (ms, no `#[inline]`) |    generic (ms) | residual gap |
+| -------: | -------------------------: | --------------: | -----------: |
+|       14 |             66.570 ± 0.084 |  61.747 ± 0.030 |        7.25% |
+|       16 |            266.400 ± 0.269 | 247.375 ± 0.100 |        7.14% |
+|       18 |           1066.481 ± 0.880 | 990.152 ± 0.559 |        7.16% |
+
+Adding `#[inline]` on the wrapper closes that gap. Same-run fused / generic ratio drops to $1.001 \pm 0.002$, within noise. Nice.
+
+`Permutation::permute_mut` doesn't carry an `#[inline]` annotation in `p3-poseidon2`, and Plonky3's release builds usually rely on monomorphisation to flatten trait-method calls anyway. The reasoning I had in my head was: monomorphisation specialises `Permutation<...>::permute_mut` for the concrete `Poseidon2GoldilocksFused<8>` type, sees the body is one call to `self.generic.permute_mut(state)`, inlines that too because it's also a monomorphised trait method, done.
+
+The reality on aarch64 release builds was different. Trait-method-via-field through a struct field added a dispatch hop LLVM declined to fold. Annotating the wrapper with `#[inline]` collapsed the residual to ~0.09% so within the noise floor of the harness.
+
+"Trivial wrapper is free" turned out to be an intuition about Rust's monomorphisation, not a guarantee about the codegen. When the wrapper sits on the hot path of an aarch64 release build, measure both ways before assuming.
+
+</details>
+
+<details>
+<summary>**Scope honesty**</summary>
+
+All numbers above are Pi 5 Cortex-A76 (r4p1, cargo 1.95.0). The aarch64 NEON code path is shared with Apple Silicon M-series, and CI's `macos-latest` covers correctness via the test runs on every push, but I have no M-series hardware to benchmark on. Cortex-A76 and M-series differ in issue width and reorder window depth that means the structural per-phase gap _should_ apply directionally on M-series too, but the magnitude was unmeasured.
+
+I also only changed the W=8 packed dispatch. The W=12, W=16, W=20 packed impls use a different code shape (`lanes_to_neon` / `neon_to_lanes` + `external_initial_neon` + `internal_permute_neon_w{12,16}`) rather than `unpack_lanes` / `pack_lanes` + `_dual_w8`. The structural gap pattern from W=8 may or may not transfer there. I have no phase-decomp data for those widths yet, and widening on speculation is the wrong move when you're a three-day-new maintainer touching a senior maintainer's NEON kernel. The PR raises this as an open question and leaves the widening for a follow-up if the maintainer wants it.
+
+</details>
+
+The two-line takeaway, if you skipped the disclosures:
+
+When a microbenchmark and a real workload disagree on the **direction** of a perf delta, not just the magnitude, the answer is almost never that one of them is broken. They're exercising different microarchitectural features. Per-phase decomposition, plus measuring whole-permute in both isolated and contiguous modes, is the most direct way I've found to figure out which.
+
+The change itself is in [Plonky3 PR #1656](https://github.com/Plonky3/Plonky3/pull/1656). Two-file diff, +17/−8 lines, ~16.4% Merkle wall-time reduction on aarch64 NEON. One of those gaps the zkmcu pipeline survey turned up. There are probably more.
+
+<ShippedImpactDetail
+  id="shipped-impact"
+  headline="16.37% Merkle wall-time reduction on aarch64 NEON"
+  hardware="Pi 5 Cortex-A76 · log2 leaves ∈ {14, 16, 18} · 5 seeds × 5 reps (n=25 per cell)"
+  appliesTo={[
+    {
+      kind: "positive",
+      text: "Any aarch64 NEON server (AWS Graviton, Ampere Altra, Apple Silicon Mac CI/build): same code path runs. Magnitude depends on microarchitecture (issue width, reorder window) and is unmeasured outside Cortex-A76, but the structural per-phase gap should apply directionally.",
+    },
+    {
+      kind: "negative",
+      text: "x86 servers (Intel, AMD): no change. This PR does not touch x86 code paths.",
+    },
+  ]}
+  scenarioHeaders={[
+    "if Merkle commit is",
+    "end-to-end saving",
+    "on $1k/mo fleet",
+    "on $10k/mo fleet",
+  ]}
+  scenarios={[
+    { label: "20% of prove time", cells: ["~3.3%", "~$33/mo", "~$330/mo"] },
+    { label: "40% of prove time", cells: ["~6.5%", "~$65/mo", "~$650/mo"] },
+    { label: "60% of prove time", cells: ["~9.8%", "~$98/mo", "~$980/mo"] },
+  ]}
+  disclaimer="Cost scenarios are rough estimates assuming linear scaling from the measured 16.4% on the Merkle step. Real savings depend on AIR, blowup factor, FRI parameters, instance type, and whether Merkle commit is actually the dominant cost on your workload. The headline 16.37% is the only directly-measured number; everything else extrapolates from it."
+/>

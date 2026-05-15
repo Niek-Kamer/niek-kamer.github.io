@@ -6,6 +6,7 @@ import ProseBand from '../../components/primitives/ProseBand.astro';
 import Stack from '../../components/primitives/Stack.astro';
 import PostCard from '../../components/writing/PostCard.astro';
 import { sprinkles } from '../../styles/sprinkles.css';
+import { computeReadTime } from '../../lib/readtime';
 import * as styles from './_styles/index.css';
 
 const entries = await getCollection('writing', ({ data }) => !data.draft);
@@ -19,14 +20,21 @@ const formatter = new Intl.DateTimeFormat('en', {
 	day: 'numeric',
 });
 
-const cards = sorted.map((post) => ({
-	href: `/writing/${post.id}`,
-	iso: post.data.publishedAt.toISOString(),
-	date: formatter.format(post.data.publishedAt),
-	title: post.data.title,
-	description: post.data.description,
-	hashTags: post.data.tags.map((t) => `#${t}`),
-}));
+const cards = sorted.map((post) => {
+	const m = post.data.headlineMetric;
+	return {
+		href: `/writing/${post.id}`,
+		iso: post.data.publishedAt.toISOString(),
+		date: formatter.format(post.data.publishedAt),
+		title: post.data.title,
+		description: post.data.description,
+		hashTags: post.data.tags.map((t) => `#${t}`),
+		readMinutes: computeReadTime(post.body ?? ''),
+		headlineMetric: m
+			? { value: m.unit ? `${m.value}${m.unit}` : String(m.value), label: m.label }
+			: undefined,
+	};
+});
 
 const heading = sprinkles({ fontSize: 'h2', fontWeight: 'semibold', letterSpacing: 'tight' });
 const subtitle = sprinkles({ fontSize: 'lg', color: 'textMuted' });

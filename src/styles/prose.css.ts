@@ -70,11 +70,24 @@ globalStyle(`${prose} blockquote`, {
 });
 
 // KaTeX display math: allow horizontal scroll inside the block so long
-// equations don't overflow the prose column.
+// equations don't overflow the prose column. Same right-edge fade as the
+// table wrapper so the scroll affordance is visible on mobile.
 globalStyle(`${prose} .katex-display`, {
 	overflowX: 'auto',
 	overflowY: 'hidden',
 	paddingBlock: vars.space.xs,
+	maskImage: 'linear-gradient(to right, black calc(100% - 1.5rem), transparent)',
+	WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 1.5rem), transparent)',
+});
+
+// Code blocks: pre has overflow-x: auto already (set in global.css.ts), but
+// the scroll affordance is invisible on mobile until the user happens to
+// swipe. Same right-edge mask gradient teaches that horizontal scroll
+// exists. Scoped to .prose so non-prose pre blocks (none currently, but
+// future-proof) aren't affected.
+globalStyle(`${prose} pre`, {
+	maskImage: 'linear-gradient(to right, black calc(100% - 1.5rem), transparent)',
+	WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 1.5rem), transparent)',
 });
 
 // Tables: editorial-label header treatment over a warm accent wash, sitting
@@ -92,16 +105,26 @@ globalStyle(`${prose} .katex-display`, {
 //     the eye down rows without competing with the header band.
 //   - `<strong>` uses accent-high in dark (lighter peach for visibility) and
 //     the base accent in light.
+// Tables are wrapped in `<div class="table-wrap">` by the rehype plugin
+// `src/lib/rehype-wrap-tables.ts`. The wrapper owns the visual box (border,
+// rounded corners, overflow scroll, right-edge mask) so the table itself
+// can extend horizontally past the column on narrow viewports. The right-
+// edge fade is a soft scroll affordance — the rightmost ~1.5rem of the
+// wrapper is masked into transparency so it's visually obvious that more
+// content lives off-screen, without needing JS to detect overflow.
+globalStyle(`${prose} .table-wrap`, {
+	overflowX: 'auto',
+	border: `1px solid ${vars.color.borderStrong}`,
+	borderRadius: vars.radius.md,
+	maskImage: 'linear-gradient(to right, black calc(100% - 1.5rem), transparent)',
+	WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 1.5rem), transparent)',
+});
+
 globalStyle(`${prose} table`, {
 	width: '100%',
 	borderCollapse: 'collapse',
 	fontSize: '0.95em',
 	fontVariantNumeric: 'tabular-nums',
-	border: `1px solid ${vars.color.borderStrong}`,
-	borderRadius: vars.radius.md,
-	// `clip-path` rounds corners properly with `border-collapse: collapse`
-	// (where `overflow: hidden` on a table is unreliable across engines).
-	clipPath: `inset(0 round ${vars.radius.md})`,
 });
 globalStyle(`${prose} th, ${prose} td`, {
 	paddingInline: '1rem',
@@ -138,4 +161,72 @@ globalStyle(`[data-theme="dark"] ${prose} table strong, [data-theme="dark"] ${pr
 });
 globalStyle(`[data-theme="light"] ${prose} table strong, [data-theme="light"] ${prose} table b`, {
 	color: vars.color.accent,
+});
+
+// Disclosure widgets (<details> / <summary>).
+//
+// Browser default renders a small black triangle that looks generic and
+// gives no hover affordance — readers have to guess that the rows are
+// clickable. Replace it with a brand-coloured chevron drawn as a CSS-only
+// rotated border square (no SVG, no JS), tinted to the accent palette so
+// it visually echoes the heading-bar treatment elsewhere on the site.
+// The chevron rotates 90° when expanded; the summary text shifts to the
+// accent colour on hover. Both transitions match the 150ms duration used
+// by other interactive elements.
+globalStyle(`${prose} details`, {
+	borderTop: `1px solid ${vars.color.border}`,
+	paddingBlock: vars.space.sm,
+});
+globalStyle(`${prose} details:last-of-type`, {
+	borderBottom: `1px solid ${vars.color.border}`,
+});
+
+globalStyle(`${prose} details > summary`, {
+	cursor: 'pointer',
+	listStyle: 'none',
+	position: 'relative',
+	paddingInlineStart: '1.5em',
+	// Bumped from `2xs` to `xs` so the clickable strip clears 40px tall on
+	// touch devices (well within Apple/Google's tap-target heuristics with
+	// the line-height-based content).
+	paddingBlock: vars.space.xs,
+	color: vars.color.text,
+	fontWeight: vars.fontWeight.semibold,
+	transition: 'color 150ms ease',
+});
+
+// Hide native disclosure marker across engines.
+globalStyle(`${prose} details > summary::-webkit-details-marker`, {
+	display: 'none',
+});
+
+// CSS-only chevron: a 0.55em square with right + bottom borders, rotated
+// to point right when collapsed. Anchored to the start of the summary,
+// vertically centred against the cap-height.
+globalStyle(`${prose} details > summary::before`, {
+	content: '""',
+	position: 'absolute',
+	left: 0,
+	top: '0.55em',
+	width: '0.55em',
+	height: '0.55em',
+	borderRight: `2px solid ${vars.color.accent}`,
+	borderBottom: `2px solid ${vars.color.accent}`,
+	transform: 'rotate(-45deg)',
+	transformOrigin: 'center',
+	transition: 'transform 200ms ease',
+});
+
+globalStyle(`${prose} details[open] > summary::before`, {
+	transform: 'rotate(45deg)',
+});
+
+globalStyle(`${prose} details > summary:hover`, {
+	color: vars.color.accent,
+});
+
+// Small left padding inside the open content so the disclosure body
+// visually aligns with the chevron, not the summary text.
+globalStyle(`${prose} details[open] > *:not(summary)`, {
+	marginInlineStart: '1.5em',
 });

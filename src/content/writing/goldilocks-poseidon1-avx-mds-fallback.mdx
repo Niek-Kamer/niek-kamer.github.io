@@ -1,13 +1,27 @@
 ---
 title: "The SIMD path that was 0.77× scalar"
-description: "How a perf-counter sanity check on Plonky3's AVX-2 packed Goldilocks Poseidon1 surfaced a missing Karatsuba back-port, and the assumption that produced it."
+description: "How a perf-counter sanity check on Plonky3's AVX-2 packed Goldilocks Poseidon1 surfaced a missing Karatsuba back-port, and what assumption I'd been making."
 publishedAt: 2026-05-13
-tags: ["plonky3", "goldilocks", "performance", "poseidon1"]
+updatedAt: 2026-05-15
+tags: ["plonky3", "goldilocks", "performance", "poseidon1", "x86", "avx", "audit", "benchmarking"]
 math: false
 toc: false
+headlineMetric:
+  label: "audit-triggered speedup"
+  value: "1.20×"
 ---
 
-After landing the [NEON canonicalize fix on Poseidon2](/niekkamer/writing/goldilocks-poseidon2-neon-canonicalize/) I had x86 perf counters open anyway, and figured I'd glance at the packed AVX-2 paths for Goldilocks Poseidon1 while I was there. What I found wasn't obvious at all. I just wanted to confirm the packed path was the obvious 2-3× over scalar that you'd expect from going 4-lane.
+import ShippedImpactCard from '../../components/writing/ShippedImpactCard.astro';
+import ShippedImpactDetail from '../../components/writing/ShippedImpactDetail.astro';
+
+<ShippedImpactCard
+  headline="Audit triggered Plonky3 #1645 — 1.20× packed AVX-2 Poseidon1 wall-time"
+  hardware="Zen 5 AVX-2 · validated post-merge"
+  scope="Issue #1642 (audit) → PR #1645 (fix by @Nashtare)"
+  detailHref="#shipped-impact"
+/>
+
+After landing the [NEON canonicalize fix on Poseidon2](/writing/goldilocks-poseidon2-neon-canonicalize) (part of my [Plonky3 Goldilocks performance track](/projects/plonky3-goldilocks-perf)), I had x86 perf counters open anyway, and figured I'd glance at the packed AVX-2 paths for Goldilocks Poseidon1 while I was there. What I found wasn't obvious at all. I just wanted to confirm the packed path was the obvious 2-3× over scalar that you'd expect from going 4-lane.
 
 It came back at 0.77×. So that means the SIMD path was actively slower than the scalar path it was supposed to replace.
 
@@ -47,7 +61,7 @@ impl Permutation<[PackedGoldilocksAVX2; 8]> for MdsMatrixGoldilocks {
 }
 ```
 
-The doc comment on `apply_circulant` is, to its credit, very direct about what it is: an O(N²) reference fallback that callers are supposed to specialise away. Scalar Goldilocks did — `SmallConvolveGoldilocks` keeps the small-constant structure (the MDS row for width 8 is `[1, 3, 4, 7, 8, 9, ...]`) and folds the dot products through an `i64 × i128` accumulator. The wide accumulator absorbs eight small multiplies before any modular work, so the scalar path never issues a full Goldilocks multiply for the MDS step.
+The doc comment on `apply_circulant` is, to its credit, very direct about what it is: an O(N²) reference fallback that callers are supposed to specialise away. Scalar Goldilocks did. `SmallConvolveGoldilocks` keeps the small-constant structure (the MDS row for width 8 is `[1, 3, 4, 7, 8, 9, ...]`) and folds the dot products through an `i64 × i128` accumulator. The wide accumulator absorbs eight small multiplies before any modular work, so the scalar path never issues a full Goldilocks multiply for the MDS step.
 
 The packed path crosses that bridge in the wrong direction. `R::from_u64` broadcasts each tiny coefficient into a packed Goldilocks element, the small-constant fact is gone by the next instruction, and every coefficient × state pair issues a full packed Goldilocks multiply through the generic kernel. Six small constants per output × eight outputs × round count, all going through the kernel that doesn't know any of them are small. That's where 4,828 came from.
 
@@ -55,10 +69,10 @@ The packed path crosses that bridge in the wrong direction. `R::from_u64` broadc
 
 The cleanest explanation is that nobody decided to ship a slow packed path on purpose. PR [#1378](https://github.com/Plonky3/Plonky3/pull/1378) landed specialised Karatsuba MDS paths for Monty31 fields, and in the same wave Goldilocks Poseidon**2** got an analogous packed path. Goldilocks Poseidon**1** was apparently skipped over. So this isn't a designed limitation, it's a missing back-port, and the two ingredients I'd need to write the specialised path are already sitting in the tree:
 
-- `FieldConvolve::conv8` / `conv12` — the same convolve routines the Poseidon2 packed path already uses.
-- `PackedGoldilocksAVX2::halve()` at `packing.rs:130` — the prerequisite for Karatsuba's halving step.
+- `FieldConvolve::conv8` / `conv12`: the same convolve routines the Poseidon2 packed path already uses.
+- `PackedGoldilocksAVX2::halve()` at `packing.rs:130`: the prerequisite for Karatsuba's halving step.
 
-The shape of the fix is mechanical from there: thin `mds_circulant_karatsuba_{8,12}` wrappers in the shared crate plus per-arch `goldilocks/src/{avx2,avx512}/poseidon1.rs` files to hook them into the `Permutation` impls. AVX-512 has the same gap (`x86_64_avx512/mds.rs:20-26`); the 8 lanes absorb more overhead than AVX-2 does but still under-deliver by roughly 1.84× of an 8× lane ceiling. Cycle-budget projection from the Poseidon2 reference puts the AVX-2 packed Poseidon1 fix near a **2× wall-time speedup** over the current path. I'm not going to defend the projection because the actual fix benchmark is the load-bearing number.
+The shape of the fix is mechanical from there: thin `mds_circulant_karatsuba_{8,12}` wrappers in the shared crate plus per-arch `goldilocks/src/{avx2,avx512}/poseidon1.rs` files to hook them into the `Permutation` impls. AVX-512 has the same gap (`x86_64_avx512/mds.rs:20-26`); the 8 lanes absorb more overhead than AVX-2 does but still under-deliver by roughly 1.84× of an 8× lane ceiling. Cycle-budget projection from the Poseidon2 reference puts the AVX-2 packed Poseidon1 fix near a **2× wall-time speedup** over the current path. I'm not going to defend the projection because the actual fix benchmark is what matters.
 
 ## The open scopes I had before I opened the implementation PR
 
@@ -75,6 +89,32 @@ The thing I assumed without checking, and the only reason I noticed any of this,
 
 The scalar Goldilocks MDS path leans on three structural facts simultaneously: the MDS coefficients are small enough that an `i64 × i128` accumulator dodges modular reduction; the circulant structure means a Karatsuba decomposition cuts multiply count from O(N²) to O(N^log₂3); and the inputs are canonical so the inner kernel skips a range check. The packed path dispatches through a generic reference kernel that knows none of those things, so the 4× lane count gets spent paying back the structural loss instead of producing any speedup.
 
-Once you state it this way, the heuristic for where else this might be hiding gets concrete: any path where the SIMD impl uses `R::from_u64` or a similarly-generic broadcast on values the scalar impl knew were small; any path where the scalar uses a recursive decomposition and the SIMD just calls the reference; any path where the scalar exploits a precondition the SIMD layer doesn't propagate. Those are three grep-able anti-patterns.
+Once you state it this way, you can grep for the same shape elsewhere. Three patterns worth looking at:
+
+- SIMD impls that use `R::from_u64` or similar generic broadcasts on values the scalar impl knew were small.
+- SIMD impls that call the generic reference where the scalar uses a recursive decomposition.
+- SIMD impls that don't carry through a precondition the scalar exploits.
 
 Discussion at [Plonky3#1642](https://github.com/Plonky3/Plonky3/issues/1642). If you've seen the same shape in another Plonky3 packed path, that's where to drop it.
+
+## Update — 2026-05-15
+
+The audit triggered a same-day fix: [Plonky3 PR #1645](https://github.com/Plonky3/Plonky3/pull/1645) by [@Nashtare](https://github.com/Nashtare), merged 2026-05-13. It specialises the packed-AVX-2 Goldilocks Poseidon1 MDS step against the small-coefficient circulant structure the scalar baseline was already exploiting. The missing Karatsuba back-port I'd been looking at. Issue #1642 was closed by the merge.
+
+Post-merge measurement on Zen 5 AVX-2: the packed Poseidon1 path moves from 0.77× scalar (the regression) to **0.93× scalar**, a **1.20× wall-time delta** on the permutation. The projection in this post matched the eventual measurement. AVX-512 had the same gap and the fix carries over to that path too.
+
+The "open scopes" section above is preserved as a snapshot of what I was about to PR before #1645 landed. The partial-round `cheap_matmul` path and the latency-hiding `InternalLayer8` / `InternalLayer12` splits remain open as follow-ups.
+
+**Continued in:** [The Poseidon2 regression my microbenchmark told me wasn't there](/writing/goldilocks-poseidon2-merkle-vs-microbench). Back to NEON, where the same "microbenchmark says X, real workload says ¬X" pattern turned up on the Goldilocks Poseidon2 packed dispatch.
+
+<ShippedImpactDetail
+  id="shipped-impact"
+  headline="Audit triggered Plonky3 #1645: 1.20× packed AVX-2 Poseidon1 wall-time speedup"
+  hardware="Zen 5 AVX-2 · pre: 0.77× scalar (regression) · post-#1645: 0.93× scalar · validated"
+  appliesTo={[
+    { kind: 'positive', text: 'x86 AVX-2 servers running Goldilocks Poseidon1 prover workloads (AWS m6i, c7i, Hetzner CCX). The audit identified a missing Karatsuba back-port; #1645 specialised mds_circulant for the small-coefficient circulant structure the scalar baseline already exploited.' },
+    { kind: 'positive', text: 'x86 AVX-512: same gap identified; fix carried over in #1645.' },
+    { kind: 'negative', text: 'aarch64 NEON (Pi 5, Apple Silicon, Graviton, Altra): unaffected. The aarch64 Goldilocks Poseidon1 path has a different shape and was not part of this audit or fix.' },
+  ]}
+  disclaimer="The 1.20× wall-time delta is the measured outcome of Plonky3 PR #1645 by @Nashtare, triggered by the perf-counter audit in this post (Issue #1642). End-to-end prover savings depend on how much of prove wall-time is spent in Goldilocks Poseidon1, which is workload-dependent and not extrapolated here. The contribution attributed to this post is the audit and analysis; the fix authorship is Nashtare's."
+/>

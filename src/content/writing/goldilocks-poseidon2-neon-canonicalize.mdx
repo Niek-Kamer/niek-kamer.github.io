@@ -1,26 +1,39 @@
 ---
 title: "The two instructions hiding in every Goldilocks Poseidon2 add"
-description: "How I went from staring at a perf annotate dump to dropping subs/csel from Plonky3's NEON addition kernel — and the small generalisable principle hiding under the diff."
+description: "How I dropped a redundant subs/csel pair from Plonky3's NEON Goldilocks addition kernel after staring at a perf annotate dump."
 publishedAt: 2026-05-13
-tags: ["plonky3", "goldilocks", "performance", "poseidon2"]
+tags: ["plonky3", "goldilocks", "performance", "poseidon2", "aarch64", "neon", "benchmarking"]
 math: true
 toc: false
+headlineMetric:
+  label: "e2e prove time"
+  value: "−2.93%"
 ---
 
-I was profiling Plonky3's Goldilocks Poseidon2 on a Raspberry Pi 5, trying to figure out where the wall-clock seconds in `prove_goldilocks_poseidon2` were actually going. The headline answer was unsurprising, the prove path is FFT and Merkle work, but the _external permute_ kernels (`external_initial_permute_dual_w8`, `external_terminal_permute_dual_w8`) sat in a fat enough position that I scrolled down into them with `perf annotate`, mostly out of curiosity.
+import ShippedImpactCard from '../../components/writing/ShippedImpactCard.astro';
+import ShippedImpactDetail from '../../components/writing/ShippedImpactDetail.astro';
+
+<ShippedImpactCard
+  headline="−2.93% end-to-end Goldilocks Poseidon2 prove time on aarch64 NEON"
+  hardware="Pi 5 Cortex-A76 · 5×5 reps, median"
+  scope="Plonky3 PR #1623 (merged)"
+  detailHref="#shipped-impact"
+/>
+
+I was profiling [Plonky3's Goldilocks Poseidon2](/projects/plonky3-goldilocks-perf) on a Raspberry Pi 5, trying to figure out where the wall-clock seconds in `prove_goldilocks_poseidon2` were actually going. The headline answer was unsurprising, the prove path is FFT and Merkle work, but the _external permute_ kernels (`external_initial_permute_dual_w8`, `external_terminal_permute_dual_w8`) sat in a fat enough position that I scrolled down into them with `perf annotate`, mostly out of curiosity.
 
 What I saw there bothered me.
 
 ## The pattern that wouldn't go away
 
-The output of `perf annotate` on the round kernel was, fundamentally, a wall of inline NEON assembly. Most of it I expected: loads, muls, the Goldilocks reduction sequence, more loads. But interleaved through all of it, every few instructions, was the same two-op pair:
+The output of `perf annotate` on the round kernel was a wall of inline NEON assembly. Most of it I expected: loads, muls, the Goldilocks reduction sequence, more loads. But interleaved through all of it, every few instructions, was the same two-op pair:
 
 ```text
 subs   xN, xM, x_p
 csel   xM, xM, xN, hs
 ```
 
-A compare against $P$ (Goldilocks's prime, $P = 2^{64} - 2^{32} + 1$), then a conditional select — the canonicalize step:
+A compare against $P$ (Goldilocks's prime, $P = 2^{64} - 2^{32} + 1$), then a conditional select. The canonicalize step:
 
 $$
 b \mapsto \begin{cases} b - P, & b \geq P \\ b, & b < P \end{cases}
@@ -34,7 +47,7 @@ The friction with that story was sitting right there in the line above each `sub
 
 ## The thing I should have seen sooner
 
-Round constants are static. They're a `const GOLDILOCKS_POSEIDON2_RC_*: [u64; N]` array, baked at compile time, never touched by user input. The values are all `< P`. Of course they are — I'd hand-checked them when I wrote the table, and they came out of a paper anyway. Asking the CPU, sixteen times per round, _"is this constant less than P?"_ — when the answer was already typed into the source — felt like a runtime tax on something I knew at compile time.
+Round constants are static. They're a `const GOLDILOCKS_POSEIDON2_RC_*: [u64; N]` array, baked at compile time, never touched by user input. The values are all `< P`. Of course they are. I'd hand-checked them when I wrote the table, and they came out of a paper anyway. Asking the CPU, sixteen times per round, _"is this constant less than P?"_, when the answer was already typed into the source, felt like a runtime tax on something I knew at compile time.
 
 That was the first crack. The wider question fell out from there: how many _other_ call sites of `add_asm` have a `b` that's provably canonical, even if the language can't tell?
 
@@ -48,13 +61,13 @@ Plus the case I _couldn't_ skip:
 
 4. **`b` is a public input to the kernel.** Some of `apply_mat4_asm`'s nine internal sums add `x[i]` directly to a running sum. Those `x[i]`'s come from arbitrary callers; the canonicalize is load-bearing. There's an existing proptest, `test_apply_mat4_asm_danger`, that exercises non-canonical inputs to exactly that contract. Touching those would break it.
 
-So the right shape wasn't to _change_ `add_asm`. It was to introduce a _sibling_ — the same `add_asm`, minus the canonicalize-b pair — and use it only where the precondition holds.
+So the right shape wasn't to _change_ `add_asm`. It was to introduce a _sibling_ (the same `add_asm`, minus the canonicalize-b pair) and use it only where the precondition holds.
 
 ## What I considered and rejected
 
 Before settling on a sibling function, two options seemed cleaner to me on the surface:
 
-- **A const-generic flag on `add_asm` itself**: `add_asm::<{ B_IS_CANONICAL: true }>(a, b)`. This is elegant on paper but ugly in practice — the inline-asm body would need to conditionally emit different instruction sequences via `cfg!` or `if const` shenanigans, and then the call-site noise (`add_asm::<true>` vs `add_asm::<false>`) doesn't actually help readers understand _why_ the precondition holds.
+- **A const-generic flag on `add_asm` itself**: `add_asm::<{ B_IS_CANONICAL: true }>(a, b)`. Elegant on paper, ugly in practice. The inline-asm body would need to conditionally emit different instruction sequences via `cfg!` or `if const` shenanigans, and then the call-site noise (`add_asm::<true>` vs `add_asm::<false>`) doesn't actually help readers understand _why_ the precondition holds.
 
 - **A runtime branch inside `add_asm`** that skips the canonicalize when `b < P`. This is hilariously self-defeating because a branch costs more than the two instructions you're trying to save, and the branch predictor has no information to predict it.
 
@@ -94,15 +107,15 @@ The kernel-level deltas dilute into the e2e number because most of `prove_goldil
 
 ## The pattern that I found worth keeping
 
-The instruction trim itself was tiny and field-specific — it only mattered because Goldilocks had a fast enough reduction that two ALU ops per add showed up on the Cortex-A76 cycle counter. On a heavier field the multiply dominates and you wouldn't notice.
+The instruction trim itself was tiny and field-specific. It only mattered because Goldilocks had a fast enough reduction that two ALU ops per add showed up on the Cortex-A76 cycle counter. On a heavier field the multiply dominates and you wouldn't notice.
 
-What I wanted to remember from this is the small generalisable principle:
+What I take from this:
 
 > **If you can prove an invariant somewhere cheaper than runtime, you can drop the runtime check.**
 
 The cheaper place might be:
 
-- **The type system** — a `Canonical<F>` wrapper that nothing can construct except via reduction.
+- **The type system**: a `Canonical<F>` wrapper that nothing can construct except via reduction.
 - **A const-table assertion** at test time, like the round-constant check above.
 - **Local code-shape annotations** at the call site, when the producer is two lines up and visibly canonicalising.
 - **A property test** that exercises the contract, like `test_apply_mat4_asm_danger`, so a future regression fails loudly.
@@ -110,3 +123,23 @@ The cheaper place might be:
 The trick is being honest about _where_ the proof lives. When I say a call site is "safe", I should have been able to point at the exact thing that makes it safe. The diff was twenty lines; the principle is reusable.
 
 Full diff and benchmark transcript: [Plonky3#1623](https://github.com/Plonky3/Plonky3/pull/1623).
+
+**Continued in:** [The SIMD path that was 0.77× scalar](/writing/goldilocks-poseidon1-avx-mds-fallback). What surfaced when I turned the same perf-counter survey on the AVX-2 Poseidon1 path next.
+
+<ShippedImpactDetail
+  id="shipped-impact"
+  headline="−2.93% end-to-end Goldilocks Poseidon2 prove time on aarch64 NEON"
+  hardware="Pi 5 Cortex-A76 · 5 seeds × 5 reps, median · governor=performance"
+  appliesTo={[
+    { kind: 'positive', text: 'Any aarch64 NEON server running Goldilocks Poseidon2 prover workloads (AWS Graviton, Ampere Altra, Apple Silicon Mac CI/build). The optimisation drops a fixed 2-instruction subs/csel pair per call. Directionally microarchitecture-independent, magnitude depends on issue width and integer-port pressure.' },
+    { kind: 'positive', text: 'Kernel-level wins are larger: −5.91% on external_terminal_permute_dual_w8, −6.21% on external_initial_permute_dual_w8. The e2e number dilutes because most prove wall-time is FFT and Merkle work this PR does not touch.' },
+    { kind: 'negative', text: 'x86 servers (Intel, AMD): no change. This PR is aarch64-only.' },
+  ]}
+  scenarioHeaders={['aarch64 prover fleet size', 'monthly saving at 2.93% e2e']}
+  scenarios={[
+    { label: '$1k/mo', cells: ['~$29/mo'] },
+    { label: '$10k/mo', cells: ['~$293/mo'] },
+    { label: '$50k/mo', cells: ['~$1.5k/mo'] },
+  ]}
+  disclaimer="The −2.93% e2e is directly measured (no Merkle-fraction extrapolation). Cost scenarios assume linear scaling and aarch64-only workload mix. Apple Silicon / Graviton / Altra direction same, magnitude unmeasured."
+/>

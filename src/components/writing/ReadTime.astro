@@ -1,0 +1,16 @@
+---
+/**
+ * "N min read" badge. Computed at build time by `src/lib/readtime.ts` and
+ * passed in via the `minutes` prop. Renders as inline text so it sits
+ * cleanly inside a Cluster of article meta.
+ */
+
+interface Props {
+	minutes: number;
+	class?: string;
+}
+
+const { minutes, class: className } = Astro.props;
+---
+
+<span class={className}>{minutes} min read</span>

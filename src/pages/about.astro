@@ -4,34 +4,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import Container from '../components/primitives/Container.astro';
 import ProseBand from '../components/primitives/ProseBand.astro';
 import Stack from '../components/primitives/Stack.astro';
-import Cluster from '../components/primitives/Cluster.astro';
-import Icon from '../components/icons/Icon.astro';
 import { sprinkles } from '../styles/sprinkles.css';
 import { prose } from '../styles/prose.css';
 import { site } from '../data/site';
-import * as styles from './_styles/about.css';
 
 // Single-entry collection: prose lives in `src/content/about/about.mdx`.
 const entry = await getEntry('about', 'about');
 if (!entry) throw new Error('about entry missing — expected src/content/about/about.mdx');
 const { Content } = await render(entry);
-
-const labelFor: Record<string, string> = {
-	github: 'GitHub',
-	mastodon: 'Mastodon',
-	x: 'X',
-	linkedin: 'LinkedIn',
-	telegram: 'Telegram',
-	email: 'Email',
-	website: 'Website',
-};
-
-// Pre-shape socials so the template stays a single map.
-const socials = site.author.socials.map((s) => ({
-	platform: s.platform,
-	url: s.url,
-	label: labelFor[s.platform] ?? s.platform,
-}));
 
 const heading = sprinkles({
 	fontSize: 'h1',
@@ -40,14 +20,6 @@ const heading = sprinkles({
 	lineHeight: 'tight',
 });
 const subtitle = sprinkles({ fontSize: 'lg', color: 'textMuted' });
-// Match the MDX-rendered h2 inside `.prose` so the "Elsewhere" section
-// reads as a peer section, not a smaller subsection.
-const sectionHeading = sprinkles({
-	fontSize: 'h2',
-	fontWeight: 'semibold',
-	letterSpacing: 'tight',
-	lineHeight: 'tight',
-});
 ---
 
 <BaseLayout title={entry.data.title} description={entry.data.description}>
@@ -62,25 +34,6 @@ const sectionHeading = sprinkles({
 				<div class={prose}>
 					<Content />
 				</div>
-
-				<Stack gap="md">
-					<h2 class={sectionHeading}>Elsewhere</h2>
-					<Cluster as="ul" gap="lg" class={styles.elsewhereList}>
-						{socials.map((s) => (
-							<li>
-								<a
-									href={s.url}
-									class={styles.socialLink}
-									rel={s.platform === 'mastodon' ? 'me noopener' : 'noopener'}
-									target={s.platform === 'email' ? undefined : '_blank'}
-								>
-									<Icon name={s.platform} />
-									<span>{s.label}</span>
-								</a>
-							</li>
-						))}
-					</Cluster>
-				</Stack>
 			</Stack>
 		</ProseBand>
 	</Container>

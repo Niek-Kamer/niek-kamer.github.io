@@ -56,6 +56,9 @@ const writing = defineCollection({
 		math: z.boolean().default(false),
 		canonical: z.url().optional(),
 		toc: z.boolean().default(true),
+		// Single headline outcome surfaced on the writing-index card (e.g.
+		// "−16.4% Merkle wall time"). Reuses the shared `metric` shape.
+		headlineMetric: metric.optional(),
 	}),
 });
 

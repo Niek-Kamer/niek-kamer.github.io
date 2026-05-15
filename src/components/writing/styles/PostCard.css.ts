@@ -29,3 +29,30 @@ export const tagList = style({
 	fontSize: vars.fontSize.sm,
 	color: vars.color.textSubtle,
 });
+
+export const metaRow = style({
+	flexWrap: 'wrap',
+});
+
+export const readTime = style({
+	fontSize: vars.fontSize.sm,
+	color: vars.color.textSubtle,
+});
+
+// Compact "value · label" badge shown beside the date. Eye-catching but
+// not loud — accent-colored value, muted label.
+export const metricChip = style({
+	display: 'inline-flex',
+	alignItems: 'baseline',
+	gap: vars.space['2xs'],
+	fontSize: vars.fontSize.sm,
+});
+
+export const metricValue = style({
+	color: vars.color.accent,
+	fontWeight: vars.fontWeight.semibold,
+});
+
+export const metricLabel = style({
+	color: vars.color.textSubtle,
+});

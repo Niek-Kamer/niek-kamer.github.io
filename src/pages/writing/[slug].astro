@@ -28,6 +28,7 @@ const { Content } = await render(post);
 	publishedAt={post.data.publishedAt}
 	updatedAt={post.data.updatedAt}
 	math={post.data.math}
+	image={`/og/${post.id}.png`}
 >
 	<Article entry={post}>
 		<Content />

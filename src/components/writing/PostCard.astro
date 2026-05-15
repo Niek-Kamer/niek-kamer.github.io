@@ -18,6 +18,11 @@ interface Props {
 		title: string;
 		description: string;
 		hashTags: string[];
+		readMinutes?: number;
+		headlineMetric?: {
+			value: string;
+			label: string;
+		};
 	};
 }
 
@@ -29,7 +34,18 @@ const descCls = sprinkles({ color: 'textMuted' });
 
 <a href={card.href} class={styles.link}>
 	<Stack gap="xs">
-		<time datetime={card.iso} class={styles.date}>{card.date}</time>
+		<Cluster gap="md" align="center" class={styles.metaRow}>
+			<time datetime={card.iso} class={styles.date}>{card.date}</time>
+			{card.readMinutes && (
+				<span class={styles.readTime}>{card.readMinutes} min read</span>
+			)}
+			{card.headlineMetric && (
+				<span class={styles.metricChip}>
+					<span class={styles.metricValue}>{card.headlineMetric.value}</span>
+					<span class={styles.metricLabel}>{card.headlineMetric.label}</span>
+				</span>
+			)}
+		</Cluster>
 		<h2 class={titleCls}>{card.title}</h2>
 		<p class={descCls}>{card.description}</p>
 		{card.hashTags.length > 0 && (

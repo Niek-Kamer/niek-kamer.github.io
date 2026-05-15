@@ -55,7 +55,7 @@
 			"name": "Escape character in string",
 			"scope": ["constant.character.escape", "string.escape"],
 			"settings": {
-				"foreground": "#9a3412"
+				"foreground": "#4d4844"
 			}
 		},
 		{
@@ -80,14 +80,14 @@
 				"constant.other.boolean"
 			],
 			"settings": {
-				"foreground": "#9a3412"
+				"foreground": "#155e75"
 			}
 		},
 		{
 			"name": "Other named constants",
 			"scope": ["constant.other", "variable.other.constant", "entity.name.constant"],
 			"settings": {
-				"foreground": "#9a3412"
+				"foreground": "#155e75"
 			}
 		},
 		{
@@ -153,7 +153,7 @@
 				"variable.function"
 			],
 			"settings": {
-				"foreground": "#9a3412"
+				"foreground": "#155e75"
 			}
 		},
 		{
@@ -186,7 +186,7 @@
 				"support.type.property-name.toml"
 			],
 			"settings": {
-				"foreground": "#9a3412"
+				"foreground": "#4d4844"
 			}
 		},
 		{
@@ -256,7 +256,7 @@
 		{
 			"name": "Diff changed",
 			"scope": ["markup.changed"],
-			"settings": { "foreground": "#9a3412" }
+			"settings": { "foreground": "#854d0e" }
 		},
 		{
 			"name": "Invalid / illegal",
@@ -274,7 +274,7 @@
 				"meta.function-call.shell"
 			],
 			"settings": {
-				"foreground": "#9a3412"
+				"foreground": "#7a4820"
 			}
 		},
 		{
@@ -288,7 +288,7 @@
 			"name": "JSX / HTML tag name",
 			"scope": ["entity.name.tag", "support.class.component"],
 			"settings": {
-				"foreground": "#9a3412"
+				"foreground": "#854d0e"
 			}
 		},
 		{

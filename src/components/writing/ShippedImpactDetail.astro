@@ -1,0 +1,91 @@
+---
+/**
+ * Longer "shipped impact" section for the bottom of a writing entry.
+ * Renders three blocks: a headline metric, where-it-applies bullets
+ * (positive / negative), and a cost-scenarios table. Pair with
+ * `<ShippedImpactCard>` near the top of the post.
+ */
+import Stack from '../primitives/Stack.astro';
+import * as styles from './styles/ShippedImpact.css';
+
+interface Applies {
+	kind: 'positive' | 'negative';
+	text: string;
+}
+
+interface Scenario {
+	label: string;
+	cells: string[];
+}
+
+interface Props {
+	id?: string;
+	headline: string;
+	hardware: string;
+	appliesTo?: Applies[];
+	scenarioHeaders?: string[];
+	scenarios?: Scenario[];
+	disclaimer?: string;
+}
+
+const {
+	id,
+	headline,
+	hardware,
+	appliesTo = [],
+	scenarioHeaders = [],
+	scenarios = [],
+	disclaimer,
+} = Astro.props;
+---
+
+<section class={styles.detail} id={id} aria-label="Shipped impact detail">
+	<Stack gap="lg">
+		<Stack gap="2xs">
+			<span class={styles.eyebrow}>Shipped impact</span>
+			<p class={styles.headline}>{headline}</p>
+			<p class={styles.hardware}>Measured on {hardware}</p>
+		</Stack>
+
+		{appliesTo.length > 0 && (
+			<Stack gap="sm">
+				<h3 class={styles.sectionTitle}>Where it applies</h3>
+				<ul class={styles.appliesList}>
+					{appliesTo.map((item) => (
+						<li class={styles.appliesItem}>
+							<span class={item.kind === 'positive' ? styles.markerPositive : styles.markerNegative}>
+								{item.kind === 'positive' ? '✓' : '✗'}
+							</span>
+							<span>{item.text}</span>
+						</li>
+					))}
+				</ul>
+			</Stack>
+		)}
+
+		{scenarios.length > 0 && scenarioHeaders.length > 0 && (
+			<Stack gap="sm">
+				<h3 class={styles.sectionTitle}>Cost translation</h3>
+				<div class={styles.tableWrap}>
+					<table class={styles.table}>
+						<thead>
+							<tr>
+								{scenarioHeaders.map((h) => <th class={styles.th}>{h}</th>)}
+							</tr>
+						</thead>
+						<tbody>
+							{scenarios.map((row) => (
+								<tr>
+									<td class={styles.td}>{row.label}</td>
+									{row.cells.map((c) => <td class={styles.td}>{c}</td>)}
+								</tr>
+							))}
+						</tbody>
+					</table>
+				</div>
+			</Stack>
+		)}
+
+		{disclaimer && <p class={styles.disclaimer}>{disclaimer}</p>}
+	</Stack>
+</section>

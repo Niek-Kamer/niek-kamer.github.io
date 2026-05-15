@@ -8,7 +8,9 @@ export type SocialPlatform =
 	| 'linkedin'
 	| 'telegram'
 	| 'email'
-	| 'website';
+	| 'website'
+	| 'hackernews'
+	| 'reddit';
 
 export type SocialLink = {
 	platform: SocialPlatform;
@@ -75,7 +77,16 @@ export const site: SiteConfig = {
 				url: 'https://www.linkedin.com/in/niek-kamer-061bb2344/',
 			},
 			{ platform: 'telegram', url: 'https://t.me/Niek01', handle: '@Niek01' },
-			{ platform: 'website', url: 'https://zkmcu.dev/' },
+			{
+				platform: 'hackernews',
+				url: 'https://news.ycombinator.com/user?id=niekkamer',
+				handle: 'niekkamer',
+			},
+			{
+				platform: 'reddit',
+				url: 'https://www.reddit.com/user/niekkamer01/',
+				handle: 'u/niekkamer01',
+			},
 		],
 	},
 	nav: [
@@ -84,7 +95,7 @@ export const site: SiteConfig = {
 		{ label: 'About', href: '/about' },
 	],
 	ogImage: '/og/default.svg',
-	now: 'Polishing zkmcu for a v0.2 release and squeezing the BN254 verifier loop on Cortex-M33.',
+	now: 'Shipping perf contributions to Plonky3 (Goldilocks Poseidon2 on Pi 5 NEON) and polishing zkmcu for v0.2.',
 	featured: [
 		{
 			label: 'Featured project',

@@ -9,8 +9,10 @@ import type { CollectionEntry } from 'astro:content';
 import Stack from '../components/primitives/Stack.astro';
 import Cluster from '../components/primitives/Cluster.astro';
 import WideBand from '../components/primitives/WideBand.astro';
+import ReadTime from '../components/writing/ReadTime.astro';
 import { sprinkles } from '../styles/sprinkles.css';
 import { prose } from '../styles/prose.css';
+import { computeReadTime } from '../lib/readtime';
 import * as styles from './styles/Article.css';
 
 interface Props {
@@ -19,6 +21,7 @@ interface Props {
 
 const { entry } = Astro.props;
 const { title, description, publishedAt, updatedAt, tags } = entry.data;
+const readMinutes = computeReadTime(entry.body ?? '');
 
 const formatter = new Intl.DateTimeFormat('en', {
 	year: 'numeric',
@@ -49,6 +52,7 @@ const descCls = sprinkles({
 					<time datetime={publishedAt.toISOString()}>
 						{formatter.format(publishedAt)}
 					</time>
+					<ReadTime minutes={readMinutes} />
 					{updatedAt && <span>Updated {formatter.format(updatedAt)}</span>}
 					{tags.length > 0 && (
 						<Cluster as="ul" gap="xs" class={styles.tagList}>
