@@ -68,7 +68,7 @@ export const site: SiteConfig = {
 	author: {
 		name: 'Niek Kamer',
 		location: 'Amsterdam, NL',
-		bio: 'Cryptographer and performance engineer working at the hardware end of both — embedded zero-knowledge proofs, hand-tuned Rust, and the parts of DeFi where cycles matter.',
+		bio: "Zero-knowledge cryptography on hardware that's too small or too slow to be taken seriously.",
 		socials: [
 			{ platform: 'github', url: 'https://github.com/Niek-Kamer', handle: '@Niek-Kamer' },
 			{ platform: 'x', url: 'https://x.com/Niek0105', handle: '@Niek0105' },
