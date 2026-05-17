@@ -8,7 +8,7 @@ export async function GET(context: APIContext) {
 	const sorted = posts.sort((a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime());
 
 	return rss({
-		title: `${site.name} — Writing`,
+		title: `${site.name} | Writing`,
 		description: 'Notes on zero-knowledge cryptography, embedded Rust, and the gap between them.',
 		site: context.site ?? site.url,
 		items: sorted.map((post) => ({

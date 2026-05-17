@@ -46,15 +46,12 @@ export type SiteConfig = {
 	ogImage: string;
 	now: string;
 	featured: FeaturedProject[];
-	// Cloudflare Web Analytics beacon token. Get one from
-	// https://dash.cloudflare.com → Analytics & Logs → Web Analytics → Add a site.
-	// Public value, safe to commit. Leave undefined to disable the script.
 	cloudflareAnalyticsToken?: string;
 };
 
 export const site: SiteConfig = {
 	name: 'Niek Kamer',
-	title: 'Niek Kamer — Embedded ZK & low-level performance',
+	title: 'Niek Kamer | Embedded ZK & low-level performance',
 	description:
 		'Engineer focused on zero-knowledge cryptography for resource-constrained devices and Rust performance work.',
 	url: 'https://niek-kamer.github.io',
@@ -70,7 +67,7 @@ export const site: SiteConfig = {
 				platform: 'linkedin',
 				url: 'https://www.linkedin.com/in/niek-kamer-061bb2344/',
 			},
-			{ platform: 'telegram', url: 'https://t.me/Niek01', handle: '@Niek01' },
+			{ platform: 'telegram', url: 'https://t.me/NiekK015', handle: '@Niek01' },
 			{
 				platform: 'hackernews',
 				url: 'https://news.ycombinator.com/user?id=niekkamer',

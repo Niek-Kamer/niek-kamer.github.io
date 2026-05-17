@@ -1,6 +1,6 @@
 {
 	"name": "Niek Kamer",
-	"short_name": "Niek Kamer",
+	"short_name": "N. Kamer",
 	"description": "Engineer focused on zero-knowledge cryptography for resource-constrained devices and Rust performance work.",
 	"icons": [
 		{ "src": "android-chrome-192x192.png", "sizes": "192x192", "type": "image/png" },
