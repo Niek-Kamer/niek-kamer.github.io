@@ -99,5 +99,5 @@ export const site: SiteConfig = {
 				'A no_std Rust Groth16/BN254 verifier that runs on a $7 RP2350 microcontroller in ~1 second.',
 		},
 	],
-	cloudflareAnalyticsToken: undefined,
+	cloudflareAnalyticsToken: 'a649319688e04742a47da5fd8a42ddba',
 };
