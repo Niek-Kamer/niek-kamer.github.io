@@ -1,7 +1,7 @@
 ---
 title: "Plonky3 Goldilocks performance"
 description: "Perf-counter-driven contributions to Plonky3's Goldilocks Poseidon paths on aarch64 NEON and x86 AVX. Measured speedups, methodology write-ups, one audit that triggered a same-day upstream fix."
-role: "Contributor"
+role: "Maintainer"
 period:
   start: "2026-04"
   end: "ongoing"
@@ -15,15 +15,18 @@ stack:
     "perf-counter analysis",
   ]
 metrics:
-  - label: "Poseidon2 e2e prove"
-    value: "−2.93%"
-    note: "Goldilocks NEON · PR #1623 (merged)"
+  - label: "Poseidon2 cross-permute batching"
+    value: "−26.4%"
+    note: "Goldilocks Zen 5 AVX-2 · PR #1667 (in review)"
   - label: "Merkle wall time"
     value: "−16.4%"
     note: "Goldilocks NEON · PR #1656 (in review)"
   - label: "AVX Poseidon1 speedup"
     value: "1.20×"
     note: "audit → @Nashtare #1645 (merged)"
+  - label: "Poseidon2 e2e prove"
+    value: "−2.93%"
+    note: "Goldilocks NEON · PR #1623 (merged)"
 links:
   repo: "https://github.com/Plonky3/Plonky3"
 featured: true
@@ -42,8 +45,10 @@ The performance track of my [zkmcu](/projects/zkmcu) work. zkmcu's deployment sh
 
 **[Plonky3 PR #1656](https://github.com/Plonky3/Plonky3/pull/1656) — packed-NEON Poseidon2 dispatch (in review).** Discovered via the Pi 5 Merkle workload survey: `Poseidon2GoldilocksFused<8>`'s packed-type `Permutation` impl was running ~16% slower than the platform-generic Poseidon2 SIMD path on Merkle commit, despite winning per-permute microbenchmarks by 3.5%. Phase decomposition reconciled the two: out-of-order overlap masked the structural per-phase gap in the per-permute benchmark, but Merkle's layer-wise data-dependency chain removed the OoO mask. Routed the packed dispatch through generic; 16.37% Merkle wall-time reduction at log2 leaves ∈ {14, 16, 18} on Pi 5 Cortex-A76. Write-up: [The Poseidon2 regression my microbenchmark told me wasn't there](/writing/goldilocks-poseidon2-merkle-vs-microbench).
 
+**[Plonky3 PR #1667](https://github.com/Plonky3/Plonky3/pull/1667) — cross-permute Poseidon2 batching (in review).** Interleaves two Poseidon2 permutations through the per-round loop so the compiler can schedule across their independent data flow, recovering throughput the single-permute kernel doesn't have. Validated across 5 stages on aarch64 NEON + Zen 5 AVX-2. Headline wins on Goldilocks: 26.4% on Zen 5 AVX-2 (width 8), 23% on Pi 5 NEON, 14-15% on Merkle commit (Zen 5).
+
 ## How I work
 
-Every contribution starts with a measurement, create a test harness around everything the code might affect in the slightest way and tend to aim for a coverage nearing 300%. The pattern across all three is: open `perf annotate` (or `cargo bench` + counter sampling) on a real workload, look for the line that doesn't match what the algorithm should be doing, and confirm the gap with a phase-decomposition harness before touching code. The write-ups document the reasoning chain so the next person doing the same survey doesn't have to start from scratch.
+Every contribution starts with a measurement, create a test harness around everything the code might affect in the slightest way and tend to aim for a coverage nearing 300%. The pattern across all three is: open `perf annotate` (or `cargo bench` + counter sampling) on a real workload, look for the line that doesn't match what the algorithm should be doing, and confirm the gap with a phase-decomposition harness before touching code. The Poseidon2 piece of that harness is now public: [poseidon2-harness](https://github.com/Niek-Kamer/poseidon2-harness) — dual-tree differential testing + PMU-cycle benches across aarch64 NEON. The write-ups document the reasoning chain so the next person doing the same survey doesn't have to start from scratch.
 
 Cost framing per contribution is on each writing post's _shipped impact_ section.

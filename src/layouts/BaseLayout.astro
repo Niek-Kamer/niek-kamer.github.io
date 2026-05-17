@@ -53,6 +53,13 @@ const mainPadding = sprinkles({
 				}
 			})();
 		</script>
+		{site.cloudflareAnalyticsToken && (
+			<script
+				defer
+				src="https://static.cloudflareinsights.com/beacon.min.js"
+				data-cf-beacon={`{"token": "${site.cloudflareAnalyticsToken}"}`}
+			/>
+		)}
 	</head>
 	<body>
 		<a href="#main" class="skip-link">Skip to content</a>

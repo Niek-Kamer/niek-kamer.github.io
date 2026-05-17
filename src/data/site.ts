@@ -46,6 +46,10 @@ export type SiteConfig = {
 	ogImage: string;
 	now: string;
 	featured: FeaturedProject[];
+	// Cloudflare Web Analytics beacon token. Get one from
+	// https://dash.cloudflare.com → Analytics & Logs → Web Analytics → Add a site.
+	// Public value, safe to commit. Leave undefined to disable the script.
+	cloudflareAnalyticsToken?: string;
 };
 
 export const site: SiteConfig = {
@@ -85,7 +89,7 @@ export const site: SiteConfig = {
 		{ label: 'About', href: '/about' },
 	],
 	ogImage: '/og/default.svg',
-	now: 'Shipping perf contributions to Plonky3 (Goldilocks Poseidon2 on Pi 5 NEON) and polishing zkmcu for v0.2.',
+	now: 'Plonky3 maintainer focused on Goldilocks Poseidon2 perf across aarch64 NEON and Zen 5 AVX-2/-512. Recently shipped cross-permute batching (PR #1667) and open-sourced the differential harness it was built on.',
 	featured: [
 		{
 			label: 'Featured project',
@@ -95,4 +99,5 @@ export const site: SiteConfig = {
 				'A no_std Rust Groth16/BN254 verifier that runs on a $7 RP2350 microcontroller in ~1 second.',
 		},
 	],
+	cloudflareAnalyticsToken: undefined,
 };
