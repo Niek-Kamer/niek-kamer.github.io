@@ -62,8 +62,6 @@ globalStyle(`${prose} .table-wrap`, {
 	overflowX: 'auto',
 	border: `1px solid ${vars.color.borderStrong}`,
 	borderRadius: vars.radius.md,
-	maskImage: 'linear-gradient(to right, black calc(100% - 1.5rem), transparent)',
-	WebkitMaskImage: 'linear-gradient(to right, black calc(100% - 1.5rem), transparent)',
 });
 
 globalStyle(`${prose} table`, {

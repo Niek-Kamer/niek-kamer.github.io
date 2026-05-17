@@ -1,0 +1,155 @@
+---
+title: "The trait-method boundary that cost Plonky3 Poseidon2 27%"
+description: "permute_mut(a); permute_mut(b) on independent states leaves 27% on Zen 5. LLVM can't see across the function-call boundary. Hand-rolling both permutes in one scope reclaims it."
+publishedAt: 2026-05-17
+tags:
+  [
+    "plonky3",
+    "goldilocks",
+    "performance",
+    "poseidon2",
+    "batching",
+    "ilp",
+    "x86",
+    "aarch64",
+  ]
+math: false
+toc: false
+headlineMetric:
+  label: "Zen 5 AVX-2 Poseidon2 (W=8)"
+  value: "−27.2%"
+---
+
+import ShippedImpactCard from "../../components/writing/ShippedImpactCard.astro";
+import ShippedImpactDetail from "../../components/writing/ShippedImpactDetail.astro";
+
+<ShippedImpactCard
+  headline="Cross-permute batched Poseidon2: 27% Zen 5 AVX-2, 31% AVX-512, 11% Pi 5 NEON (W=8)"
+  hardware="Zen 5 9950X3D + Pi 5 Cortex-A76 · 5 seeds × N=1M"
+  scope="Plonky3 PR #1667 (in review)"
+  detailHref="#shipped-impact"
+/>
+
+I'd been running a cross-arch [Plonky3 Goldilocks Poseidon2 perf survey](/projects/plonky3-goldilocks-perf), the latest in a series that started with the [`add_canonical_asm` work](/writing/goldilocks-poseidon2-neon-canonicalize) two weeks ago and most recently turned up [a Merkle-vs-microbench regression](/writing/goldilocks-poseidon2-merkle-vs-microbench). One question I wanted to answer cleanly was this: when a caller invokes `permute_mut` twice back-to-back on two independent input states, exactly what a Merkle-tree layer compression does, does LLVM end up interleaving the two permutations?
+
+Most of the perf wins so far had been at the single-permute level. Two to sixteen percent per permute on aarch64 NEON. But Merkle commit is the bigger wall-time chunk on the zkmcu pipeline, and Merkle is fundamentally `for sibling_pair in chunks: permute_mut(combined)`. If the OoO engine could already interleave consecutive permutes on independent states the way it interleaves a tight loop of independent vector adds, there'd be no slack to extract. Just measure and move on.
+
+So I wrote the simplest possible test.
+
+## The 0% result
+
+A `permute_mut_batched_h1` function. Two states, one scope, call `permute_mut(&mut state_a); permute_mut(&mut state_b)` back-to-back. Measure single-permute baseline vs the H1 doubled call. Zen 5 9950X3D, `taskset -c 0`, governor=performance, AVX-2 target, five seeds, one million iterations per seed.
+
+The result was 0% improvement. Within 0.1% across five seeds. Whatever cross-state ILP I thought might be there, it wasn't there.
+
+That was the load-bearing measurement. Before it, "Merkle would benefit from cross-permute batching" was a hypothesis. After it, the hypothesis was: there's slack between the in-call ILP that LLVM and the OoO engine _can_ harvest and the cross-call ILP they _can't_. Hand-rolling the two permutes' round structure inside one function scope, instead of relying on two `permute_mut` calls, should expose that slack.
+
+## Why the boundary was opaque
+
+The mechanism turned out to be simple, and I'd been thinking about it backwards. LLVM's loop-vectorizer chews on a tight loop of independent ops, finds the parallelism, schedules it across vector lanes. But two `permute_mut` _calls_ are not a tight loop. They're a function-call boundary. The body of `permute_mut(state_a)` is a sequence of layer calls (`external_initial`, `internal`, `external_terminal`), each of which is itself a method call on a trait object's blanket impl. By the time the linker is done, LLVM sees `permute_mut(a)` and `permute_mut(b)` as opaque blobs with a return-address-shaped wall between them. The partial-round dependency chain inside each permute (round $N$'s S-box on `state[0]` depending on round $N-1$'s MDS output) lives behind that wall.
+
+The OoO engine has its own version of the same story. Even if the function bodies inline (and on aarch64 release builds they often don't, see [the `#[inline]` gotcha from last week](/writing/goldilocks-poseidon2-merkle-vs-microbench)), the speculative window is sized for individual hot loops, not whole permutations. A Poseidon2 permute at width 8 retires ~3-5 thousand instructions on the round body. The reorder window can chew on the tail of permute A and the head of permute B if they're _scheduled together by the compiler_. If the compiler emits them as sequential function calls, the OoO engine sees them as a sequential stream too.
+
+So the fix shape was to put both states' round structure inside one function scope. `permute_batch_b2_p2_w8(&mut state_a, &mut state_b, &constants)`. Each round body now does state-A's MDS then state-B's MDS, state-A's S-box then state-B's S-box, and so on. LLVM emits an interleaved instruction stream. The OoO engine schedules state-A and state-B ops to fill issue slots that sequential single-permute leaves unused.
+
+## The numbers
+
+Per-permute mean ns/permute, five seeds × N=1M each, post-#1645 baseline:
+
+| Width | ISA              | Single | Batched B=2 | Reduction       |
+| ----: | ---------------- | -----: | ----------: | --------------- |
+|     8 | Zen 5 AVX-2 (4L) |   1734 |        1243 | **~27.2% ± 0.7** |
+|     8 | Zen 5 AVX-512 (8L) |  1715 |        1170 | **~31.5% ± 0.9** |
+|     8 | Pi 5 NEON (2L)   |   3891 |        3473 | **~10.82% ± 0.08** |
+|    12 | Zen 5 AVX-2 (4L) |   2260 |        1846 | **~18.6% ± 0.2** |
+|    12 | Zen 5 AVX-512 (8L) |  2284 |        1676 | **~26.6% ± 0.3** |
+|    12 | Pi 5 NEON (2L)   |   5678 |        5530 | **~2.65% ± 0.04** |
+
+Five of six measured cells reduce by more than ten percent per permute. The floor is Pi 5 NEON at width 12: 2.65%, small but stable across seeds.
+
+## The IPC sanity check
+
+Wall-time wins are necessary evidence but not sufficient. They tell you the kernel is faster; they don't tell you _why_. To confirm the OoO-slack story I'd been telling about the boundary, I wanted microarchitectural data: if the mechanism was real, IPC should jump while instruction count per permute stayed flat.
+
+I ran the same B=2 transformation on the sibling Poseidon1 port (separate investigation, same mechanism applied to a different round structure) and pulled retired-instruction and cycle counts via `perf stat`. Mean over the same 5 seeds:
+
+| metric                  |   single | batched B=2 | Δ              |
+| ----------------------- | -------: | ----------: | -------------- |
+| IPC                     |    2.484 |       2.954 | **+18.9%**     |
+| instructions / permute  |        K |       2.7×K | matches B=2    |
+| register spill rate     |     7.2% |        4.5% | **lower**      |
+
+Three things to read out of that.
+
+IPC jumps 18.9%. That's "more ops retiring per cycle", which is exactly the shape you'd predict if the bottleneck was issue-slot underutilization and not memory bandwidth or instruction count. The OoO engine had spare slots; the single-permute kernel wasn't filling them.
+
+Instruction count per permute scales ~2.7×, not the naïve 2×. That's consistent with the 2 states × full-round-then-partial-round structure: the partial rounds are skinnier than full rounds, so two states share less work proportionally in the partial-round body than in the full-round body. The win isn't "fewer instructions"; it's "same instructions retiring faster".
+
+Register spill rate drops _despite_ doubling the live state. This was the counter-intuitive one. Hand-rolling appears to give the register allocator better information about live ranges; cross-state ops don't compete for the same register windows the way intra-state ops do. The result is fewer stack reloads per permute, not more.
+
+All three lined up with the wall-time numbers. The mechanism is real.
+
+## Why Pi 5 NEON width 12 is the smallest win
+
+The mechanism requires spare execution-port issue width and OoO reorder budget. Cortex-A76 has 2 NEON pipes; Zen 5 has 4 vector pipes. Plus a smaller OoO window on the A76 side. Width 12's internal-round path (`internal_layer_mat_mul_goldilocks_12`) does more ops per round than width 8, which means single-permute is closer to pipe saturation on NEON. Less slack to harvest. The NEON width 12 number is 2.65%, the floor across all six measured cells.
+
+To confirm pipe-saturation rather than some other ceiling, I ran a B=4 probe on width 8: four states interleaved instead of two. NEON has 32 v-registers; 4 × 8 = 32 hot state regs fits with no spill budget. The result: B=4 _lost_ to B=2 on NEON (mean 10.55% vs 11.16% reduction across five seeds, B=4 0.6pp worse). On x86 the same B=4 probe _won_ another 2-4pp at both AVX-2 and AVX-512.
+
+So the ceiling has a clean shape. NEON's two vector pipes saturate around B=2 and adding more states past that doesn't help. x86 still has spare issue width at B=4. The B=2 sweet spot is the cross-arch one. It captures most of the x86 win without losing the NEON win to register pressure.
+
+## Where this applies
+
+The PR exposes the primitive (`permute_batch_b2_p2_w{8,12}`) without wiring it into Plonky3's higher-level `Permutation` traits yet. That conversation is intentionally a follow-up so the API-shape design can happen in review. But the natural call sites are clear from the work:
+
+- **Merkle tree layer compression** at `merkle-tree/src/merkle_tree.rs:488-504`. Sibling compressions within a layer are independent; the loop is parallel-chunkable. This is the primary target, and it's also the workload that originally turned up the 16% Merkle gap from the previous post.
+- **FRI commit-phase tree builds**. Secondary, same shape.
+
+Sequential paths like sponge-absorb chains have a per-call data dependency: each output feeds into the next. Cross-permute interleaving has no slack to capture there. Those callers continue using the unchanged `permute_mut` path; this PR doesn't touch them.
+
+## What I want to remember from this
+
+LLVM's loop-vectorizer is good. The OoO engine is good. But there are still failure modes where work that _looks_ to a human like obvious parallelism (two function calls, two independent inputs, no shared state) is hidden behind a boundary the compiler treats as opaque. Function-call boundaries on functions with non-trivial bodies are one of those boundaries. Trait-method-via-blanket-impl is another.
+
+The lesson isn't "the compiler is broken". The compiler is doing exactly what its abstractions tell it to. The lesson is that when the hot path crosses one of these boundaries, the fix isn't a compiler bug report. The fix is writing the kernel shape such that there's no boundary for the compiler to be opaque about.
+
+The 0% H1 result was the cheapest sixty seconds I spent on this lane. Knowing _that_ the boundary was opaque collapsed two days of "is the slack even there" into one day of "here's where it is, here's how to capture it."
+
+Full diff and benchmark transcripts: [Plonky3 PR #1667](https://github.com/Plonky3/Plonky3/pull/1667).
+
+Related work on the same [Plonky3 Goldilocks perf arc](/projects/plonky3-goldilocks-perf): [The two instructions hiding in every Goldilocks Poseidon2 add](/writing/goldilocks-poseidon2-neon-canonicalize), [The SIMD path that was 0.77× scalar](/writing/goldilocks-poseidon1-avx-mds-fallback), [The Poseidon2 regression my microbenchmark told me wasn't there](/writing/goldilocks-poseidon2-merkle-vs-microbench), [The AVX-512 kernel that was 1.79× slower than the compiler's](/writing/goldilocks-poseidon2-avx512-falsifications).
+
+<ShippedImpactDetail
+  id="shipped-impact"
+  headline="Cross-permute batched Poseidon2: 27% Zen 5 AVX-2 / 31% AVX-512 / 11% Pi 5 NEON (W=8)"
+  hardware="Zen 5 9950X3D + Pi 5 Cortex-A76 · 5 seeds × N=1M per cell · post-#1645 baseline"
+  appliesTo={[
+    {
+      kind: "positive",
+      text: "Any caller that invokes Permutation::permute_mut on independent states in a loop. Primary target is Merkle tree layer compression, where sibling compressions within a layer are independent and the loop is parallel-chunkable. FRI commit-phase tree builds are secondary, same shape.",
+    },
+    {
+      kind: "positive",
+      text: "x86 servers running Zen 5 (or wider-issue / deeper-OoO cores) see the biggest wins per permute. Direction holds on any superscalar OoO core; magnitude depends on issue width, vector-pipe count, and OoO window depth.",
+    },
+    {
+      kind: "negative",
+      text: "Sequential hash chains (sponge-absorb, etc.) have a per-call data dependency. Cross-permute interleaving has no slack to capture there. Unchanged by this PR.",
+    },
+    {
+      kind: "negative",
+      text: "Apple M-series, AWS Graviton, Intel x86: not measured. Direction should hold per the mechanism; magnitude unmeasured.",
+    },
+  ]}
+  scenarioHeaders={[
+    "if Merkle commit is",
+    "end-to-end saving (Zen 5)",
+    "on $1k/mo fleet",
+    "on $10k/mo fleet",
+  ]}
+  scenarios={[
+    { label: "20% of prove time", cells: ["~5.4%", "~$54/mo", "~$540/mo"] },
+    { label: "40% of prove time", cells: ["~10.9%", "~$109/mo", "~$1090/mo"] },
+    { label: "60% of prove time", cells: ["~16.3%", "~$163/mo", "~$1630/mo"] },
+  ]}
+  disclaimer="Cost scenarios assume linear scaling from the measured 27% per-permute reduction on Zen 5 AVX-2 width 8, applied to the Merkle commit fraction of e2e prove time. Real savings depend on AIR, blowup factor, FRI parameters, instance type, and whether Merkle commit is actually the dominant cost on your workload. AVX-512 (~31%) and NEON (~11% width 8 / 2.65% width 12) would scale proportionally. Headline percentages are the only directly-measured numbers."
+/>

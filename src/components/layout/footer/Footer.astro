@@ -40,7 +40,7 @@ const socialLink = sprinkles({
 	<Container>
 		<Cluster justify="space-between" align="center" gap="md" class={footerPadding}>
 			<p class={styles.copy}>
-				© {year} {site.author.name} · {site.author.location}
+				© {year} {site.author.name} · {site.author.location} · <a href="/cv.pdf">CV</a>
 			</p>
 			<Cluster as="ul" gap="xs" class={styles.socials} aria-label="Elsewhere">
 				{site.author.socials.map((s) => (

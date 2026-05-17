@@ -76,17 +76,13 @@ export const site: SiteConfig = {
 				url: 'https://news.ycombinator.com/user?id=niekkamer',
 				handle: 'niekkamer',
 			},
-			{
-				platform: 'reddit',
-				url: 'https://www.reddit.com/user/niekkamer01/',
-				handle: 'u/niekkamer01',
-			},
 		],
 	},
 	nav: [
 		{ label: 'Work', href: '/projects' },
 		{ label: 'Writing', href: '/writing' },
 		{ label: 'About', href: '/about' },
+		{ label: 'Contact', href: '/contact' },
 	],
 	ogImage: '/og/default.svg',
 	now: 'Plonky3 maintainer focused on Goldilocks Poseidon2 perf across aarch64 NEON and Zen 5 AVX-2/-512. Recently shipped cross-permute batching (PR #1667) and open-sourced the differential harness it was built on.',

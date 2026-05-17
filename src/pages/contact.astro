@@ -1,0 +1,107 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Container from '../components/primitives/Container.astro';
+import ProseBand from '../components/primitives/ProseBand.astro';
+import Stack from '../components/primitives/Stack.astro';
+import Icon from '../components/icons/Icon.astro';
+import { sprinkles } from '../styles/sprinkles.css';
+import { prose } from '../styles/prose.css';
+import { site } from '../data/site';
+
+const heading = sprinkles({
+	fontSize: 'h1',
+	fontWeight: 'semibold',
+	letterSpacing: 'tight',
+	lineHeight: 'tight',
+});
+const subtitle = sprinkles({ fontSize: 'lg', color: 'textMuted' });
+
+const labelFor: Record<string, string> = {
+	github: 'GitHub',
+	mastodon: 'Mastodon',
+	x: 'X',
+	linkedin: 'LinkedIn',
+	telegram: 'Telegram',
+	hackernews: 'Hacker News',
+	reddit: 'Reddit',
+	email: 'Email',
+	website: 'Website',
+};
+
+const channels = [
+	{
+		platform: 'email',
+		url: 'mailto:info@axobello.com',
+		handle: 'info@axobello.com',
+	},
+	...site.author.socials,
+];
+
+const channelRow = sprinkles({
+	display: 'flex',
+	alignItems: 'center',
+	gap: 'md',
+	paddingBlock: 'xs',
+});
+
+const channelIcon = sprinkles({
+	color: 'textMuted',
+	display: 'inline-flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+});
+
+const channelLabel = sprinkles({
+	color: 'text',
+	fontWeight: 'semibold',
+	fontSize: 'sm',
+});
+
+const channelHandle = sprinkles({
+	color: 'textMuted',
+	fontSize: 'sm',
+});
+---
+
+<BaseLayout
+	title="Contact"
+	description="Niek Kamer — perf engineering on zk proof systems. Available for contracts and senior IC roles."
+>
+	<Container>
+		<ProseBand>
+			<Stack as="article" gap="2xl">
+				<Stack gap="md">
+					<h1 class={heading}>Contact</h1>
+					<p class={subtitle}>{site.author.location}</p>
+				</Stack>
+
+				<div class={prose}>
+					<p>
+						Best reached by email. Available for zk perf engineering contracts and senior IC
+						roles. The <a href="/cv.pdf">CV (PDF)</a> has the relevant track; the{' '}
+						<a href="/projects/plonky3-goldilocks-perf">Plonky3 perf project page</a> has live
+						links to merged and in-review work.
+					</p>
+				</div>
+
+				<Stack as="ul" gap="sm" style="list-style: none; padding: 0;">
+					{channels.map((c) => (
+						<li class={channelRow}>
+							<span class={channelIcon} aria-hidden="true">
+								<Icon name={c.platform} />
+							</span>
+							<a
+								href={c.url}
+								rel={c.platform === 'mastodon' ? 'me noopener' : 'noopener'}
+								target={c.platform === 'email' ? undefined : '_blank'}
+							>
+								<span class={channelLabel}>{labelFor[c.platform] ?? c.platform}</span>
+								{c.handle && <span class={channelHandle}> · {c.handle}</span>}
+							</a>
+						</li>
+					))}
+				</Stack>
+			</Stack>
+		</ProseBand>
+	</Container>
+</BaseLayout>

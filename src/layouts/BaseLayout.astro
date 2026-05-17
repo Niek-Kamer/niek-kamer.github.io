@@ -1,6 +1,4 @@
 ---
-import '@fontsource-variable/fraunces/opsz.css';
-import '@fontsource-variable/jetbrains-mono/index.css';
 import '../styles/theme.css';
 import '../styles/global.css';
 
@@ -35,6 +33,21 @@ const mainPadding = sprinkles({
 <html lang={site.locale}>
 	<head>
 		<BaseHead {...props} />
+		<link
+			rel="preload"
+			href="/fonts/fraunces-latin-opsz-normal.woff2"
+			as="font"
+			type="font/woff2"
+			crossorigin
+		/>
+		<link
+			rel="preload"
+			href="/fonts/jetbrains-mono-latin-wght-normal.woff2"
+			as="font"
+			type="font/woff2"
+			crossorigin
+		/>
+		<link rel="stylesheet" href="/fonts/fonts.css" />
 		{props.math && (
 			<link
 				rel="stylesheet"
