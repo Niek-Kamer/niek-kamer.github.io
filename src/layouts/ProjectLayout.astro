@@ -1,12 +1,4 @@
 ---
-/**
- * Project detail layout. Renders the schema metadata above the MDX content:
- *   - Header: title, description
- *   - Meta cluster: period · role · external links
- *   - Stack chips
- *   - Metrics grid (label / value+unit / optional note)
- *   - <slot/> — MDX body, styled by the shared `prose` class
- */
 import type { CollectionEntry } from 'astro:content';
 import Stack from '../components/primitives/Stack.astro';
 import Cluster from '../components/primitives/Cluster.astro';
@@ -29,7 +21,6 @@ const MONTHS = [
 ];
 
 function formatPart(s: string): string {
-	// 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'
 	const parts = s.split('-');
 	if (parts.length === 1) return parts[0];
 	const m = MONTHS[Number.parseInt(parts[1], 10) - 1];
@@ -49,8 +40,6 @@ const LINK_LABELS: Record<string, string> = {
 	package: 'Package',
 };
 
-// Flatten the optional links record into a sorted array of present links so
-// the template can do one map without nested member checks.
 const linkRows = (Object.entries(links) as Array<[string, string | undefined]>)
 	.filter((pair): pair is [string, string] => Boolean(pair[1]))
 	.map(([kind, url]) => ({ kind, label: LINK_LABELS[kind] ?? kind, url }));

@@ -1,10 +1,4 @@
 ---
-/**
- * One entry in a writing list. Takes a pre-shaped card (href, iso, date,
- * title, description, hashTags) so the parent loop stays free of nested
- * member access + sub-maps — Astro's JSX parser doesn't love deeply nested
- * arrow-into-arrow-into-JSX expressions.
- */
 import Stack from '../primitives/Stack.astro';
 import Cluster from '../primitives/Cluster.astro';
 import { sprinkles } from '../../styles/sprinkles.css';

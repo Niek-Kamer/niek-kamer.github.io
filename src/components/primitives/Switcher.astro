@@ -1,14 +1,4 @@
 ---
-/**
- * Row → column at a threshold. Children share width equally when in a row;
- * they full-width when stacked. Use for "two cards side-by-side, stacked
- * on mobile".
- *
- *   <Switcher at="md" gap="lg">
- *     <Card />
- *     <Card />
- *   </Switcher>
- */
 import type { HTMLAttributes } from 'astro/types';
 import { sprinkles, type Sprinkles } from '../../styles/sprinkles.css';
 
@@ -22,7 +12,6 @@ interface Props extends HTMLAttributes<'div'> {
 
 const { as: Tag = 'div', gap = 'md', at = 'md', class: className, ...rest } = Astro.props;
 
-// Use a responsive flexDirection — sprinkles handles the breakpoint condition.
 const cls = sprinkles({
 	display: 'flex',
 	flexDirection: { base: 'column', [at]: 'row' },

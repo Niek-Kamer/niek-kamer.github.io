@@ -1,38 +1,12 @@
-/**
- * Build-time Open Graph card renderer. Returns a 1200x630 PNG for a
- * writing post, generated via Satori (JSX → SVG) and resvg (SVG → PNG).
- *
- * Dark variant only. Per-platform `prefers-color-scheme` handling on
- * og:image is poorly supported (most crawlers cache one image), so we
- * pick the variant that pops in feed instead of generating both.
- *
- * Visual contract:
- *  - 1200×630 (X/Twitter card size, the de-facto OG standard).
- *  - Warm umber dark bg with left accent rail (matches the rest of the
- *    site's heading + ShippedImpactCard treatment).
- *  - Brand line at top, large title centred, description below it,
- *    headline metric at bottom-left, date at bottom-right.
- *  - All measurements in absolute px so satori (which has limited CSS
- *    support) renders predictably.
- */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Resvg } from '@resvg/resvg-js';
 import satori from 'satori';
 
-// Inter regular + bold from the @fontsource/inter package. WOFF is the
-// satori-supported format that ships in @fontsource. Resolved against
-// `process.cwd()` (the project root) instead of `import.meta.url` because
-// the latter rewrites to the build-time output directory once Astro
-// bundles this module for prerendering — and the node_modules tree only
-// exists at the project root.
 const FONT_DIR = join(process.cwd(), 'node_modules/@fontsource/inter/files');
 const interRegular = readFileSync(join(FONT_DIR, 'inter-latin-400-normal.woff'));
 const interBold = readFileSync(join(FONT_DIR, 'inter-latin-700-normal.woff'));
 
-// Palette mirrors `darkTokens` in src/styles/theme.css.ts so the OG card
-// reads as the same brand as the site itself. Kept inline so the renderer
-// has no runtime CSS dependency.
 const palette = {
 	bg: '#16130f',
 	bgElevated: '#2a2520',
@@ -65,11 +39,6 @@ export async function renderOG(data: OGData): Promise<Uint8Array> {
 	return resvg.render().asPng();
 }
 
-/**
- * Build the satori JSX tree as plain objects. Satori only supports a
- * narrow CSS subset (flex layout, basic typography, a few visual props),
- * so this hand-rolled tree is the safest authoring surface.
- */
 function buildCard(data: OGData) {
 	const titleSize = data.title.length > 70 ? 56 : 64;
 
@@ -88,7 +57,6 @@ function buildCard(data: OGData) {
 				position: 'relative',
 			},
 			children: [
-				// Left accent rail.
 				{
 					type: 'div',
 					props: {
@@ -102,7 +70,6 @@ function buildCard(data: OGData) {
 						},
 					},
 				},
-				// Top brand line.
 				{
 					type: 'div',
 					props: {
@@ -117,7 +84,6 @@ function buildCard(data: OGData) {
 						children: 'Niek Kamer · Writing',
 					},
 				},
-				// Title — sized fluidly by length.
 				{
 					type: 'div',
 					props: {
@@ -133,7 +99,6 @@ function buildCard(data: OGData) {
 						children: data.title,
 					},
 				},
-				// Description.
 				{
 					type: 'div',
 					props: {
@@ -147,14 +112,12 @@ function buildCard(data: OGData) {
 						children: truncate(data.description, 180),
 					},
 				},
-				// Spacer pushes the footer row to the bottom of the card.
 				{
 					type: 'div',
 					props: {
 						style: { display: 'flex', flexGrow: 1 },
 					},
 				},
-				// Footer row: metric on the left, date on the right.
 				{
 					type: 'div',
 					props: {

@@ -1,11 +1,19 @@
 ---
 title: "Plonky3 Goldilocks performance"
-description: "Perf-counter-driven contributions to Plonky3's Goldilocks Poseidon paths on aarch64 NEON and x86 AVX — measured speedups, methodology write-ups, one audit that triggered a same-day upstream fix."
+description: "Perf-counter-driven contributions to Plonky3's Goldilocks Poseidon paths on aarch64 NEON and x86 AVX. Measured speedups, methodology write-ups, one audit that triggered a same-day upstream fix."
 role: "Contributor"
 period:
   start: "2026-04"
   end: "ongoing"
-stack: ["Rust", "aarch64 NEON", "AVX-2", "AVX-512", "Plonky3", "perf-counter analysis"]
+stack:
+  [
+    "Rust",
+    "aarch64 NEON",
+    "AVX-2",
+    "AVX-512",
+    "Plonky3",
+    "perf-counter analysis",
+  ]
 metrics:
   - label: "Poseidon2 e2e prove"
     value: "−2.93%"
@@ -24,7 +32,7 @@ order: 2
 
 ## What this is
 
-The performance track of my [zkmcu](/projects/zkmcu) work. zkmcu's deployment shape is _prove on a Raspberry Pi 5 (Cortex-A76 NEON), verify on a Pico 2 (Cortex-M33)_, which means the Pi 5 prover side has to be fast or the whole pipeline isn't useful. [Plonky3](https://github.com/Plonky3/Plonky3) is the proving system underneath, and Goldilocks Poseidon2 is the hot path on both halves — so I've been doing perf-counter surveys of its Goldilocks kernels and submitting fixes upstream.
+The performance track of my [zkmcu](/projects/zkmcu) work. zkmcu's deployment shape is _prove on a Raspberry Pi 5 (Cortex-A76 NEON), verify on a Pico 2 (Cortex-M33)_, which means the Pi 5 prover side has to be fast or the whole pipeline isn't useful. [Plonky3](https://github.com/Plonky3/Plonky3) is the proving system underneath, and Goldilocks Poseidon2 is the hot path on both halves. So I have been doing perf-counter surveys of its Goldilocks kernels and submitting fixes upstream.
 
 ## Shipped contributions
 
@@ -36,6 +44,6 @@ The performance track of my [zkmcu](/projects/zkmcu) work. zkmcu's deployment sh
 
 ## How I work
 
-Every contribution starts with a measurement, not an idea. The pattern across all three is: open `perf annotate` (or `cargo bench` + counter sampling) on a real workload, look for the line that doesn't match what the algorithm should be doing, and confirm the gap with a phase-decomposition harness before touching code. The write-ups document the reasoning chain so the next person doing the same survey doesn't have to start from scratch.
+Every contribution starts with a measurement, create a test harness around everything the code might affect in the slightest way and tend to aim for a coverage nearing 300%. The pattern across all three is: open `perf annotate` (or `cargo bench` + counter sampling) on a real workload, look for the line that doesn't match what the algorithm should be doing, and confirm the gap with a phase-decomposition harness before touching code. The write-ups document the reasoning chain so the next person doing the same survey doesn't have to start from scratch.
 
 Cost framing per contribution is on each writing post's _shipped impact_ section.

@@ -10,8 +10,6 @@ export async function GET(context: APIContext) {
 	return rss({
 		title: `${site.name} — Writing`,
 		description: 'Notes on zero-knowledge cryptography, embedded Rust, and the gap between them.',
-		// Astro injects the absolute URL of the site at build time. We assert
-		// because the project sets `site` in `astro.config.mjs` — RSS requires it.
 		site: context.site ?? site.url,
 		items: sorted.map((post) => ({
 			title: post.data.title,

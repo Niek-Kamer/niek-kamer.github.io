@@ -1,32 +1,7 @@
-/**
- * Atomic, typesafe, responsive style props.
- *
- * Every value below is constrained to a token key from the Rust-generated
- * scale, so `<Stack gap="md" />` and `<Stack gap={{ base: 'sm', md: 'lg' }} />`
- * are both checked at compile time and impossible to call with a magic number.
- *
- * Two property sets:
- *   - `responsive`: applies across all 8 breakpoints (base + xs..4xl)
- *   - `static`:     single-condition only (colors, weight, etc.)
- *
- * The exported `sprinkles` function composes both — use it from any primitive
- * or styled component:
- *
- *   sprinkles({
- *     display: 'flex',
- *     gap: { base: 'sm', md: 'md', xl: 'lg' },
- *     color: 'textMuted',
- *   })
- */
 import { createSprinkles, defineProperties } from '@vanilla-extract/sprinkles';
 import { media } from './breakpoints.css';
 import { vars } from './theme.css';
 
-// Combined type-scale for `fontSize`. Static keys (xs..6xl) and fluid heading
-// roles (body, h1..h4, display) live in one flat namespace. Fluid xs/sm/lg/xl
-// collide with the static scale at the same names and are intentionally not
-// exposed here — reach for `vars.fluid.xs` etc. directly on the rare occasion
-// you need a fluid version of those small sizes.
 const typeScale = {
 	xs: vars.fontSize.xs,
 	sm: vars.fontSize.sm,
@@ -46,9 +21,6 @@ const typeScale = {
 	display: vars.fluid.display,
 } as const satisfies Record<string, string>;
 
-// `base` is the no-media-query default. Order matters: each later condition
-// only applies when narrower ones haven't won — sprinkles emits them in
-// declaration order, so largest-last is correct.
 const conditions = {
 	base: {},
 	xs: { '@media': media.xs },
@@ -99,12 +71,9 @@ const responsiveProperties = defineProperties({
 		width: ['auto', '100%', 'fit-content', 'max-content', 'min-content'],
 		textAlign: ['left', 'center', 'right'],
 		fontSize: typeScale,
-		// Useful for "stack on small, side-by-side on md+" idioms where
-		// you want column-reverse semantics without recomputing flex order.
 		order: ['0', '1', '2', '-1'],
 	},
 	shorthands: {
-		// Tachyons/Tailwind-style aliases for the few props that earn one.
 		px: ['paddingInline'],
 		py: ['paddingBlock'],
 		mx: ['marginInline'],
@@ -112,7 +81,6 @@ const responsiveProperties = defineProperties({
 		p: ['padding'],
 		m: ['margin'],
 		size: ['width', 'maxWidth'],
-		// `placeItems` shorthand — applies to both axes for the common case.
 		place: ['alignItems', 'justifyContent'],
 	},
 });

@@ -7,7 +7,6 @@ export const meta = style({
 	fontVariantNumeric: 'tabular-nums',
 });
 
-// Reset list semantics for the stack & link clusters.
 export const list = style({
 	listStyle: 'none',
 	margin: 0,
@@ -23,7 +22,6 @@ export const stackChip = style({
 	color: vars.color.textMuted,
 });
 
-// Project external links: text + arrow, accent-coloured.
 export const projectLink = style({
 	color: vars.color.accent,
 	fontWeight: vars.fontWeight.medium,
@@ -37,7 +35,6 @@ export const projectLink = style({
 	},
 });
 
-// Metrics grid cell.
 export const metric = style({
 	padding: vars.space.md,
 	borderRadius: vars.radius.md,

@@ -8,7 +8,6 @@ import { sprinkles } from '../styles/sprinkles.css';
 import { prose } from '../styles/prose.css';
 import { site } from '../data/site';
 
-// Single-entry collection: prose lives in `src/content/about/about.mdx`.
 const entry = await getEntry('about', 'about');
 if (!entry) throw new Error('about entry missing — expected src/content/about/about.mdx');
 const { Content } = await render(entry);

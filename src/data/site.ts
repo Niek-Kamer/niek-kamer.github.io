@@ -1,6 +1,3 @@
-// Single source of truth for site-wide metadata.
-// Imported by layouts, SEO components, footer, RSS feed.
-
 export type SocialPlatform =
 	| 'github'
 	| 'mastodon'
@@ -35,9 +32,6 @@ export type FeaturedProject = {
 	name: string;
 	url: string;
 	summary: string;
-	// Optional small uppercase tag shown above the title ("Featured project",
-	// "Open source", etc.). Keeps the homepage card flexible without
-	// proliferating types.
 	label?: string;
 };
 
@@ -50,8 +44,6 @@ export type SiteConfig = {
 	author: Author;
 	nav: NavLink[];
 	ogImage: string;
-	// One-sentence "what I'm working on right now" line for the homepage
-	// sidebar. Cheap to edit when reality changes.
 	now: string;
 	featured: FeaturedProject[];
 };
@@ -61,8 +53,6 @@ export const site: SiteConfig = {
 	title: 'Niek Kamer — Embedded ZK & low-level performance',
 	description:
 		'Engineer focused on zero-knowledge cryptography for resource-constrained devices and Rust performance work.',
-	// TODO: replace with the deployed origin once a domain is chosen.
-	// GH Pages default is https://<user>.github.io/<repo>; a custom domain (e.g. niekkamer.dev) overrides it.
 	url: 'https://niek-kamer.github.io',
 	locale: 'en',
 	author: {

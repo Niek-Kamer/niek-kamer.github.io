@@ -11,8 +11,6 @@ export const link = style({
 	},
 });
 
-// Hover lifts the title into accent. `globalStyle` because the selector
-// targets a descendant.
 globalStyle(`${link}:hover h2`, { color: vars.color.accent });
 
 export const period = style({
@@ -21,9 +19,6 @@ export const period = style({
 	fontVariantNumeric: 'tabular-nums',
 });
 
-// Warm accent gives the badge visual heat against the cool primary accent
-// elsewhere on the card. Lets the "Featured" label pop without competing
-// with the title-hover colour.
 export const featuredBadge = style({
 	fontSize: vars.fontSize.xs,
 	fontWeight: vars.fontWeight.semibold,

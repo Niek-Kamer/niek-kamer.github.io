@@ -15,9 +15,6 @@ import {
 	zIndex,
 } from '../generated/tokens';
 
-// Shape of every token the design system exposes. Color tokens are the only
-// values that vary between light/dark; everything else (space, type, motion)
-// comes from the Rust-generated scale and is shared across themes.
 export const vars = createThemeContract({
 	color: {
 		bg: null,
@@ -26,11 +23,6 @@ export const vars = createThemeContract({
 		text: null,
 		textMuted: null,
 		textSubtle: null,
-		// Three accent slots. `accent` is the workhorse — links, focus rings,
-		// brand hover, primary buttons. `accentWarm` adds visual heat for
-		// "featured", success-y badges, or anywhere the cool cyan would feel
-		// flat. `accentSoft` is the decorative one — section eyebrows,
-		// tag chips, gentle emphasis. Use sparingly to avoid rainbow soup.
 		accent: null,
 		accentText: null,
 		accentWarm: null,
@@ -147,13 +139,8 @@ export const vars = createThemeContract({
 	},
 });
 
-// All non-color tokens are shared across themes — they come directly from the
-// generated scale (single source of truth in `tokens-gen/`).
 const sharedTokens = {
 	font: {
-		// Fraunces variable handles both display and body via the `opsz` optical-size
-		// axis (set globally with `font-optical-sizing: auto`). Using one family for
-		// the whole site keeps the editorial feel tight; weight is the differentiator.
 		display: '"Fraunces Variable", Fraunces, Georgia, "Times New Roman", Times, serif',
 		sans: '"Fraunces Variable", Fraunces, Georgia, "Times New Roman", Times, serif',
 		mono: '"JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
@@ -173,11 +160,6 @@ const sharedTokens = {
 	zIndex,
 };
 
-// zkmcu palette — warm umber dark, cream paper light. One accent hue (peach
-// on dark, umber on light) drives the whole site so the whole thing reads
-// as a single hue family rather than fighting cool/warm complements.
-// Mirrors `project-zkmcu/zkmcu-web/src/styles/custom.css`.
-
 const lightTokens = {
 	...sharedTokens,
 	color: {
@@ -187,8 +169,6 @@ const lightTokens = {
 		text: '#1c2524',
 		textMuted: '#3f4540',
 		textSubtle: '#6a6a5a',
-		// Warm umber accent. Earthy peach hue shifted darker so it hits WCAG
-		// AA on the cream background.
 		accent: '#b07348',
 		accentText: '#faf7f0',
 		accentWarm: '#7a4820',
@@ -210,9 +190,6 @@ const darkTokens = {
 		text: '#d8d1c5',
 		textMuted: '#c2bbac',
 		textSubtle: '#958e82',
-		// Pale peach accent (#dfaf8f) for body affordances; lighter peach
-		// (#f2ceae) for high-contrast headings/strong. Dark wash (#3a281f)
-		// is the subtle accent-tinted background (sidebar active etc).
 		accent: '#dfaf8f',
 		accentText: '#16130f',
 		accentWarm: '#f2ceae',
@@ -225,8 +202,6 @@ const darkTokens = {
 	},
 };
 
-// Apply tokens via the `data-theme` attribute on <html>. An inline script in
-// BaseLayout sets this before paint so there's no light/dark flash.
 globalStyle(':root', {
 	vars: assignVars(vars, lightTokens),
 });

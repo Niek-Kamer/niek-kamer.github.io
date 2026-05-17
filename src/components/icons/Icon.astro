@@ -1,16 +1,4 @@
 ---
-/**
- * Inline-SVG icon dispatcher. `name` is type-narrowed against the known set
- * — adding an icon is a 2-line change (extend `IconName` + add a branch).
- *
- * Mixes stroke (lucide) and fill (simple-icons) variants per icon because
- * brand logos look wrong as outlines but lucide doesn't ship every brand.
- * All icons render at the same `size` so the optical weight stays consistent
- * inside a cluster.
- *
- *   <Icon name="github" />
- *   <Icon name="email" size={24} class="…" />
- */
 export type IconName = 'github' | 'mastodon' | 'x' | 'linkedin' | 'telegram' | 'email' | 'website' | 'hackernews' | 'reddit';
 
 interface Props {
@@ -22,9 +10,6 @@ interface Props {
 
 const { name, size = 20, class: className, 'aria-hidden': ariaHidden = 'true' } = Astro.props;
 
-// Lucide-style stroke icons share these attributes. The object is annotated
-// `as const` so `stroke-linecap`/`-linejoin` narrow to their literal types,
-// which Astro's SVGAttributes interface requires.
 const strokeAttrs = {
 	width: size,
 	height: size,
@@ -36,7 +21,6 @@ const strokeAttrs = {
 	'stroke-linejoin': 'round',
 } as const;
 
-// simple-icons brand logos use fill instead.
 const fillAttrs = {
 	width: size,
 	height: size,

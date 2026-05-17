@@ -14,8 +14,6 @@ globalStyle('html', {
 	WebkitFontSmoothing: 'antialiased',
 	MozOsxFontSmoothing: 'grayscale',
 	scrollBehavior: 'smooth',
-	// Fraunces variable: let the browser pick the right `opsz` master per font
-	// size so small body text uses the text-cut and headings use the display-cut.
 	fontOpticalSizing: 'auto',
 	accentColor: vars.color.accent,
 	caretColor: vars.color.accent,
@@ -61,8 +59,6 @@ globalStyle('a', {
 	transition: `color ${vars.duration.fast} ${vars.easing.standard}`,
 });
 
-// :visited has special browser handling — explicitly pin to accent so it
-// doesn't fall through to Open Props' default `--link-visited` (purple).
 globalStyle('a:visited', {
 	color: vars.color.accent,
 });
@@ -80,11 +76,6 @@ globalStyle('code', {
 	borderRadius: vars.radius.sm,
 });
 
-// Code blocks: subtle background fill, no border (lighter visual chrome
-// than a framed box). Horizontal padding is tight so the first character
-// of each line aligns near the paragraph left edge — wider padding makes
-// the code look indented vs. surrounding prose. Vertical padding still
-// gives the block breathing room.
 globalStyle('pre', {
 	margin: 0,
 	paddingBlock: vars.space.md,
@@ -98,9 +89,6 @@ globalStyle('pre', {
 	lineHeight: vars.lineHeight.snug,
 });
 
-// Subtle inset highlight on dark mode to lift the code surface off the
-// page bg without a hard border. Light mode skips this — the lighter
-// codeBg already reads as elevated against the cream page.
 globalStyle('[data-theme="dark"] pre', {
 	boxShadow: `0 1px 0 ${vars.color.bgElevated} inset`,
 });
@@ -112,10 +100,6 @@ globalStyle('pre code', {
 	fontSize: 'inherit',
 });
 
-// Shiki dual-theme switching. `defaultColor: false` in astro.config makes
-// Shiki emit both palettes as CSS variables on every code token. Below we
-// pick the active palette via the `[data-theme]` attribute on <html>:
-// light is the default; dark overrides when `[data-theme="dark"]` is set.
 globalStyle('.astro-code', {
 	backgroundColor: 'var(--shiki-light-bg)',
 	color: 'var(--shiki-light)',
@@ -153,7 +137,6 @@ globalStyle('img, svg, video, canvas', {
 	height: 'auto',
 });
 
-// Off-screen skip link revealed on focus — wired up from BaseLayout.
 globalStyle('.skip-link', {
 	position: 'absolute',
 	insetInlineStart: vars.space.sm,

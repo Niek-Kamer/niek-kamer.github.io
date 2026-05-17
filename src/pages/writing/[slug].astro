@@ -4,8 +4,6 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Article from '../../layouts/Article.astro';
 
 export async function getStaticPaths() {
-	// Drafts are excluded in production builds; in dev they show up so you
-	// can preview them while writing.
 	const posts = await getCollection('writing', ({ data }) =>
 		import.meta.env.PROD ? !data.draft : true,
 	);

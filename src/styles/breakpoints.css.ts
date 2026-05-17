@@ -1,17 +1,6 @@
 import { type BreakpointsKey, breakpoints } from '../generated/tokens';
 
-/// Pre-built media query strings for VE `@media` blocks.
-///
-/// Usage:
-/// ```ts
-/// style({
-///   fontSize: vars.fontSize.base,
-///   '@media': {
-///     [media.md]: { fontSize: vars.fontSize.lg },
-///     [media.xl]: { fontSize: vars.fontSize.xl },
-///   },
-/// });
-/// ```
+``;
 export const media = {
 	xs: `screen and (min-width: ${breakpoints.xs})`,
 	sm: `screen and (min-width: ${breakpoints.sm})`,

@@ -1,7 +1,6 @@
 import { style } from '@vanilla-extract/css';
 import { vars } from '../../../styles/theme.css';
 
-// Restrained accent box. Sits in the prose flow without screaming.
 export const card = style({
 	border: `1px solid ${vars.color.border}`,
 	borderLeft: `3px solid ${vars.color.accent}`,

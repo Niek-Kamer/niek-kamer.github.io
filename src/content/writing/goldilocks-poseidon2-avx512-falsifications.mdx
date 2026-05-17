@@ -1,0 +1,100 @@
+---
+title: "The AVX-512 kernel that was 1.79× slower than the compiler's"
+description: "I spent six hours writing a hand-tuned AVX-512 Goldilocks Poseidon2 kernel. It came back 1.79× slower than the path it was trying to replace. Then I almost wrote a second one."
+publishedAt: 2026-05-16
+tags:
+  [
+    "plonky3",
+    "goldilocks",
+    "performance",
+    "poseidon2",
+    "x86",
+    "avx512",
+    "methodology",
+    "post-mortem",
+  ]
+math: false
+toc: false
+---
+
+I'd been staring at Zen 5 perf counters on Plonky3's Goldilocks Poseidon2. The [verifier-tier survey](/projects/plonky3-goldilocks-perf) I'd been running flagged x86 as the un-tuned side of an impl gap: aarch64 has a hand-tuned NEON kernel that Nashtare wrote in PR #1303, x86 has nothing of the sort. The packed AVX-2 / AVX-512 paths exist (they're the prover-tier 8-lane batches at 215 ns/perm on Zen 5), but the single-permutation verifier path goes through the generic Rust Poseidon2 with no hand-tuned x86 asm anywhere.
+
+The opportunity I scoped looked like back-porting plonky2's hand-asm Goldilocks Poseidon pattern from scalar mulx to AVX-512. The disasm pass I ran before writing any kernel code killed the scalar-mulx half of the premise immediately. rustc 1.95 + znver5 already emits optimal `mulx + add + sbb` for Goldilocks multiply, and the multiply itself is under 16% of cycles. The bottleneck was elsewhere. 70% of the cycles lived in adds, canonicalize, and shifts. Bookkeeping.
+
+The pivot looked obvious: SIMD-ize the 70% bookkeeping. AVX-512, single permutation, eight scalar Goldilocks lanes packed into one `__m512i`, all the canonicalize and diagonal and MDS work going from scalar to vector. Keep the S-box scalar at the lane boundary because that's where mulx lives. Projected somewhere in the 15-25% wall-time reduction range, by analogy to the NEON port's win on the same algebra.
+
+Six hours later the kernel came back **1.79× slower** than the upstream path it was trying to beat.
+
+## The number I had to stare at for a while
+
+The harness build was tight. Five SIMD primitives, a set of round components, a `permute_w8_avx512` driver, scalar S-boxes at the lane boundary. 29 unit tests, plus 4 integration tests across 5000+ random states comparing bit-equal against `default_goldilocks_poseidon2_8`. Two runs, criterion default settings, znver5 target-cpu, boost off, taskset.
+
+| Path                                     | Median   | vs upstream      |
+| ---------------------------------------- | -------- | ---------------- |
+| `default_goldilocks_poseidon2_8.permute` | 436.8 ns | 1.00×            |
+| `permute_w8_avx512` (my kernel)          | 782.0 ns | **1.79× slower** |
+
+Variance ±0.16% across reps. The kernel was correct (5000+ bit-equal states), measured cleanly, and almost twice as slow as the path I'd written it to replace.
+
+I'd flagged a "failure-case bound" of `>436 ns` in the scoping doc that morning. The kernel landed inside the failure bound exactly. An afternoon of work that the discipline of writing the bound down had already, in some sense, warned me about.
+
+## What I'd missed about SIMD
+
+The mistake was a mental model that took me an hour to write down properly after the measurement landed. Three things I missed:
+
+**1. SIMD compresses throughput, not latency.** `simd_add_canonical` is a five-op dep chain (add → cmplt-mask → mask-add → sub → min). About five cycles latency per call. The diagonal layer for width 8 chains many of these together. Single permutation has no throughput parallelism to exploit; the chain is the chain. Going SIMD doesn't shorten dep chains, it just runs more of them at once. There weren't more to run.
+
+**2. Scalar OoO was already eating the per-lane parallelism.** Zen 5 dispatches six to eight scalar ops per cycle and runs eight scalar Goldilocks adds within a layer largely in parallel via out-of-order execution. The mental model "scalar = sequential" was just wrong. Eight independent scalar adds with no inter-dependence look like a SIMD vector to the OoO engine, give or take.
+
+**3. SIMD ports execute on fewer ALU pipes than scalar ports on Zen 5.** Four vector ports vs four-plus scalar ALUs. Going SIMD on numeric-heavy bookkeeping moves throughput off the wider pipe onto the narrower one. Not unconditionally a problem, but you have to actually have lane-parallelism to amortize the per-op cost, and at single-permutation there isn't any.
+
+The kernel was correct. The premise behind writing it was false.
+
+## The failure bound I'd written down
+
+The scoping doc I wrote before starting the kernel explicitly named a "failure case" bound of `>436 ns`. The actual measurement: 782 ns. Inside the failure-case bound.
+
+The bound came from a [perf-analysis rigor pass I'd worked through on a different lane a few days earlier](/projects/plonky3-goldilocks-perf), where I'd ended up shelving an AVX-512 Phase 2 design after the projection model said the gain was 1.02-1.10× and the band touched "no win." The shape that survives both that lane and this one is bounds, not points. A point projection ("this should be 15-25% faster") sits inside a wider band of possibility, and if the band touches "slower than baseline" then "slower than baseline" is a real outcome to plan for. If you don't sketch the band before you commit, you commit on optimism.
+
+I sketched the band. The band caught it. Slowly, after the fact, the way a guardrail catches you when you fall into it. Better than no guardrail. Not as good as the version of me that would have looked at the band and said "the failure case is on the table, do a pre-flight before sinking six hours."
+
+## The kernel I didn't write
+
+Immediately after the measurement landed, I had an instinct to chain-pivot. The failure mechanism was about single-permutation having no throughput parallelism. Fine. Multi-permutation batches do have throughput parallelism. The existing packed path runs 215 ns/perm on Zen 5 by doing exactly that, eight permutations in lock-step over `[F::Packing; 8]`. A hand-tuned multi-perm AVX-512 kernel could beat it, right? Doesn't the mechanism that killed the first kernel not apply?
+
+This is exactly the instinct that, six hours earlier, had walked me into writing the slower kernel.
+
+So I stopped, and wrote a scoping doc instead. The doc named four hypothesized slack sources between the auto-vectorized packed path and a hand-tuned multi-perm kernel: cross-round canonicalize fusion, register spill traffic, S-box scheduling, round-constant handling. The doc said: do a one-to-two hour pre-flight disasm of the existing packed path. If at least one of those four slack sources shows up in the disasm, proceed to harness. If none of them do, kill the lane.
+
+Thirty minutes of `objdump` later, all four were negative.
+
+| Hypothesis                                   | Verdict      | Evidence in disasm                                                                                  |
+| -------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------- |
+| Canonicalize fat (per-op `min_uq` after add) | **No slack** | 94 `vpaddq` vs 22 `vpminuq` in the 213-instruction internal-round body. Already deferred.           |
+| Spill / fill traffic to stack                | **No slack** | Zero `vmovdqu64` / `vmovdqa64` touching `[rsp+...]` or `[rbp+...]`. ~18 of 32 zmms used.            |
+| S-box `vextracti64x4 → mulx → vinserti64x4`  | **No slack** | Uses 14 `vpmuludq` (32×32→64 decomposition) in-lane. No extract path. Canonical AVX-512 approach.   |
+| Per-round constant reload                    | **No slack** | One `vpbroadcastq` per round (unavoidable). Static constants hoisted to live regs outside the loop. |
+
+The compiler's auto-vectorization of the generic Rust Poseidon2 was, on every dimension my scoping doc had enumerated, already at the floor. Nothing to hand-tune.
+
+## The slack the disasm did find
+
+There is structural slack. The packed path runs at roughly 0.70 instructions per cycle. Zen 5's sustained SIMD IPC ceiling on dependent vector code is somewhere around 3-4. So the path is at ~18-23% of the port-bound ceiling.
+
+That's not nothing. But it's also not exploitable by hand-tuning the same kernel shape. The slack is dep-chain latency on the multi-precision multiply (`vpmuludq` is 4-5 cycle latency on Zen 5, and the reduction chains through `vpsrlq → vpaddq → vpsubq` serially per lane). To exploit dep-chain-latency slack you change the kernel shape, not the kernel contents. Either wider batches (16 permutations laid out as `[__m512i; 16]` with two zmm registers per state position) or software-pipelined round-to-round interleaving across two perm-batches so the OoO engine sees double the in-flight work.
+
+Both are major rewrites that deserve their own scoping doc. Neither is "fix what the compiler missed." My pre-flight had asked the wrong question for capturing this slack, but the right question to keep me from writing the wrong kernel. Different question, different answer, no chain-pivot.
+
+I closed the lane and went back to NEON work.
+
+## What I want to remember from this
+
+The first instinct after a falsified projection is to find the closest-shaped thing that the falsification "doesn't apply to" and chase it. The failure mechanism behind the slower kernel didn't apply to multi-perm batches in the same way it applied to single-perm. That's true. It's also exactly the line of reasoning that walked me into writing the slower kernel in the first place. "The previous concern doesn't apply" is the shape of an unverified premise.
+
+The version that worked was writing the pre-flight as its own short scoping pass and naming four falsifiable conditions for proceeding, before any code. Thirty minutes. Saved me from another four-to-eight hours of writing a kernel that wouldn't have shipped.
+
+The shape I want to install for next time: when a projection model has been falsified once on a lane, the next "but this is different" instinct on that lane is exactly the place the pre-flight gate goes. Not a sense of how much to commit. A hard `kill / proceed` rule, written down, before the work starts.
+
+The kernel from the morning still exists as a local artifact, correct and almost twice as slow as the path it was trying to replace. The pre-flight findings from the afternoon sit next to it. Neither ships as a Plonky3 PR. The pre-flight gate ships as a default step the next time I have a "this is different" instinct on this territory, which is the only thing here I think is worth keeping.
+
+Related work on the same [Plonky3 Goldilocks perf arc](/projects/plonky3-goldilocks-perf): [The two instructions hiding in every Goldilocks Poseidon2 add](/writing/goldilocks-poseidon2-neon-canonicalize), [The SIMD path that was 0.77× scalar](/writing/goldilocks-poseidon1-avx-mds-fallback), [The Poseidon2 regression my microbenchmark told me wasn't there](/writing/goldilocks-poseidon2-merkle-vs-microbench).

@@ -2,9 +2,6 @@
 import { sprinkles } from '../../../styles/sprinkles.css';
 import * as styles from './styles/ThemeSwitcher.css';
 
-// All visual concerns flow through sprinkles + the small co-located CSS file
-// (which only owns hover, focus-ring offset, and the icon-swap selectors that
-// sprinkles can't express).
 const button = sprinkles({
 	display: 'inline-flex',
 	alignItems: 'center',
@@ -64,9 +61,6 @@ const button = sprinkles({
 </button>
 
 <script>
-	// Theme toggle: cycles light ↔ dark, persisting to localStorage. Initial
-	// state is set pre-paint by the inline script in BaseLayout.astro, so we
-	// only need to handle clicks here.
 	const buttons = document.querySelectorAll<HTMLButtonElement>('[data-theme-toggle]');
 
 	function syncAriaLabel(btn: HTMLButtonElement, theme: string) {
@@ -85,8 +79,6 @@ const button = sprinkles({
 			try {
 				localStorage.setItem('theme', next);
 			} catch {
-				// localStorage blocked (private mode, sandboxed) — accept the loss,
-				// the user can re-toggle on next paint.
 			}
 			for (const b of buttons) syncAriaLabel(b, next);
 		});

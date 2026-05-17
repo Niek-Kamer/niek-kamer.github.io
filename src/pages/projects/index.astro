@@ -22,8 +22,6 @@ function formatPart(s: string): string {
 
 const entries = await getCollection('projects', ({ data }) => !data.draft);
 
-// Sort: featured first, then by `order` ascending (so order=0 ends up
-// alongside non-featured), then by period.start descending as a tiebreaker.
 const sorted = entries.sort((a, b) => {
 	if (a.data.featured !== b.data.featured) return a.data.featured ? -1 : 1;
 	if (a.data.order !== b.data.order) return a.data.order - b.data.order;

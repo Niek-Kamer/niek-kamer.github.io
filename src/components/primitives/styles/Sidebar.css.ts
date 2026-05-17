@@ -1,10 +1,6 @@
 import { style, styleVariants } from '@vanilla-extract/css';
 import { media } from '../../../styles/breakpoints.css';
 
-// The side column's width is supplied at runtime via the `--sidebar-width`
-// CSS custom property (set inline on the wrapper from the `sideWidth` prop).
-// That lets us keep all the layout variants statically declared while still
-// driving the column template from a typesafe Rust token.
 const widthVar = 'var(--sidebar-width)';
 
 const orderings = {
@@ -12,8 +8,6 @@ const orderings = {
 	side: `${widthVar} 1fr`,
 };
 
-// 4 breakpoints × 2 orderings. Static enumeration keeps VE happy and lets us
-// avoid runtime style generation.
 export const layouts = styleVariants({
 	sm_content: {
 		'@media': {
