@@ -4,7 +4,7 @@ description: "How a perf-counter sanity check on Plonky3's AVX-2 packed Goldiloc
 publishedAt: 2026-05-13
 updatedAt: 2026-05-15
 tags: ["plonky3", "goldilocks", "performance", "poseidon1", "x86", "avx", "audit", "benchmarking"]
-math: false
+math: true
 toc: false
 headlineMetric:
   label: "audit-triggered speedup"
@@ -61,7 +61,7 @@ impl Permutation<[PackedGoldilocksAVX2; 8]> for MdsMatrixGoldilocks {
 }
 ```
 
-The doc comment on `apply_circulant` is, to its credit, very direct about what it is: an O(N²) reference fallback that callers are supposed to specialise away. Scalar Goldilocks did. `SmallConvolveGoldilocks` keeps the small-constant structure (the MDS row for width 8 is `[1, 3, 4, 7, 8, 9, ...]`) and folds the dot products through an `i64 × i128` accumulator. The wide accumulator absorbs eight small multiplies before any modular work, so the scalar path never issues a full Goldilocks multiply for the MDS step.
+The doc comment on `apply_circulant` is, to its credit, very direct about what it is: an $O(N^2)$ reference fallback that callers are supposed to specialise away. Scalar Goldilocks did. `SmallConvolveGoldilocks` keeps the small-constant structure (the MDS row for width 8 is `[1, 3, 4, 7, 8, 9, ...]`) and folds the dot products through an `i64 × i128` accumulator. The wide accumulator absorbs eight small multiplies before any modular work, so the scalar path never issues a full Goldilocks multiply for the MDS step.
 
 The packed path crosses that bridge in the wrong direction. `R::from_u64` broadcasts each tiny coefficient into a packed Goldilocks element, the small-constant fact is gone by the next instruction, and every coefficient × state pair issues a full packed Goldilocks multiply through the generic kernel. Six small constants per output × eight outputs × round count, all going through the kernel that doesn't know any of them are small. That's where 4,828 came from.
 
@@ -87,7 +87,7 @@ The thing I assumed without checking, and the only reason I noticed any of this,
 
 > **A SIMD rewrite is only faster than the scalar baseline if it preserves whatever structure the scalar baseline was exploiting.**
 
-The scalar Goldilocks MDS path leans on three structural facts simultaneously: the MDS coefficients are small enough that an `i64 × i128` accumulator dodges modular reduction; the circulant structure means a Karatsuba decomposition cuts multiply count from O(N²) to O(N^log₂3); and the inputs are canonical so the inner kernel skips a range check. The packed path dispatches through a generic reference kernel that knows none of those things, so the 4× lane count gets spent paying back the structural loss instead of producing any speedup.
+The scalar Goldilocks MDS path leans on three structural facts simultaneously: the MDS coefficients are small enough that an `i64 × i128` accumulator dodges modular reduction; the circulant structure means a Karatsuba decomposition cuts multiply count from $O(N^2)$ to $O(N^{\log_2 3})$; and the inputs are canonical so the inner kernel skips a range check. The packed path dispatches through a generic reference kernel that knows none of those things, so the 4× lane count gets spent paying back the structural loss instead of producing any speedup.
 
 Once you state it this way, you can grep for the same shape elsewhere. Three patterns worth looking at:
 

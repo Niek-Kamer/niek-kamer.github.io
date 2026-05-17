@@ -19,6 +19,13 @@ globalStyle(`${prose} > h2 + *, ${prose} > h3 + *, ${prose} > h4 + *`, {
 	marginBlockStart: '0.5em',
 });
 
+// Same inter-element spacing inside <details> blocks (collapsible sections).
+globalStyle(`${prose} details > * + *`, { marginBlockStart: '1.25em' });
+
+// Paragraph-to-paragraph spacing is bumped above the line-height gap so the
+// break is visually distinct from inter-line spacing within a paragraph.
+globalStyle(`${prose} p + p`, { marginBlockStart: '1.5em' });
+
 globalStyle(`${prose} h2`, {
 	fontSize: vars.fluid.h2,
 	fontWeight: vars.fontWeight.semibold,

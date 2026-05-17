@@ -1,0 +1,70 @@
+---
+title: "BNO055 driver fork"
+description: "Maintained fork of the Rust driver for the Bosch BNO055 IMU. Removed unsafe blocks, fixed an axis-remap bug hidden behind a clippy allow, cut sensor-read latency 27-36%, added 206 tests."
+role: "Maintainer"
+period:
+  start: "2026-04"
+  end: "2026-04"
+stack: ["Rust", "no_std", "embedded-hal 1.0", "I2C", "Pi 5"]
+metrics:
+  - label: "Full sensor loop"
+    value: "−36%"
+    note: "9.83 ms → 6.28 ms · 102 Hz → 159 Hz on Pi 5"
+  - label: "Per-read latency"
+    value: "−27%"
+    note: "page-tracking eliminates redundant I2C writes"
+  - label: "Tests added"
+    value: "0 → 206"
+    note: "integration tests covering all sensor paths"
+links:
+  repo: "https://github.com/Niek-Kamer/BNO055"
+featured: false
+order: 3
+---
+
+## What it is
+
+A `no_std` Rust driver for the [Bosch BNO055](https://www.bosch-sensortec.com/products/smart-sensors/bno055/) 9-axis IMU. Forked from [`eupn/bno055`](https://github.com/eupn/bno055) and reworked for memory safety, correctness, and per-read latency. Used inside the PID autonomous motor-control pipeline on a Raspberry Pi 5.
+
+## What I found and fixed
+
+**Bug: `AxisRemap::y()` returned the X axis.** The getter was `self.x` instead of `self.y`, hidden under `#[allow(clippy::misnamed_getters)]`. Any user calling `.y()` got the wrong axis silently. Fixed and the lint allow removed so it can't regress.
+
+**Two `unsafe` blocks in calibration serialisation.** `from_buf` and `as_bytes` used raw pointer casts to reinterpret a `BNO055Calibration` struct as bytes. Rewrote both to use field-by-field construction and an owned `[u8; 22]` return value. No more `unsafe` anywhere in the crate.
+
+**Redundant I2C writes on every sensor read.** The driver re-set the register page on each call, even when already on the correct page. Added `page` field tracking with `set_page()` skipping the write when the requested page is already active. −27% on all reads (eliminated ~0.5 ms per call).
+
+**No bulk read API.** Reading all six sensors meant 6+ separate I2C transactions. Added `all_sensor_data()` reading registers `0x08-0x34` (45 bytes) in one transaction; returns an `AllSensorData` struct with `Option` fields based on operation-mode availability. −36% over the per-sensor baseline.
+
+**Unit error type on `AxisRemapBuilder::build()`.** Replaced `Result<AxisRemap, ()>` with `Result<AxisRemap, InvalidAxisRemap>` so callers can distinguish failure modes.
+
+**Three unnecessary dependencies.** Replaced `byteorder` with `i16::from_le_bytes()` from core. Replaced `num-derive`/`num-traits` `FromPrimitive` with manual `match` arms. Three fewer transitive deps, including two proc-macros.
+
+**Zero tests.** Added 206 integration tests covering the sensor reads, calibration profile read/write, axis-remap builder, mode transitions, and error paths.
+
+**996-line monolithic `lib.rs`.** Split into 9 focused modules (`sensors`, `axis`, `mode`, `calibration`, `acc_config`, `status`, `regs`, `std`, plus a slimmer `lib.rs` for the public surface). No breaking changes to the public API; internal helpers moved from `pub` to `pub(crate)`.
+
+## Measurements
+
+Pi 5, I2C-1 at 100 kHz, sensor in NDOF fusion mode, stationary, `cargo bench --bench sensor_reads`:
+
+| Read type                  | Before    | After     | Δ          |
+| -------------------------- | --------: | --------: | ---------: |
+| `temperature`              |   1.02 ms |   0.60 ms | **−41%**   |
+| `accel_data` (6 bytes)     |   1.69 ms |   1.26 ms | **−25%**   |
+| `gyro_data` (6 bytes)      |   1.67 ms |   1.24 ms | **−26%**   |
+| `mag_data` (6 bytes)       |   1.71 ms |   1.26 ms | **−26%**   |
+| `euler_angles`             |   1.70 ms |   1.24 ms | **−27%**   |
+| `quaternion` (8 bytes)     |   1.97 ms |   1.53 ms | **−22%**   |
+| all 6 sensors (individual) |   9.83 ms |   7.16 ms | **−27%**   |
+| **`all_sensor_data` bulk** | (no API)  |   6.28 ms | **−36%**   |
+
+Full sensor loop: 9.83 ms → 6.28 ms (102 Hz → 159 Hz). A loop that barely fit a 10 ms window now has 3.7 ms of headroom for other work on the same tick.
+
+## What I take from this
+
+The page-tracking and bulk-read wins came from reading the datasheet carefully and noticing that the upstream driver was structurally suboptimal — not from clever tricks. The bug fix came from running clippy without the `allow` annotation upstream had silenced.
+
+The shape that travels is: when a library has been used productively for years and looks fine, the obvious-on-second-read mistakes are usually still there. Someone has to actually look.
+
+Repo: [github.com/Niek-Kamer/BNO055](https://github.com/Niek-Kamer/BNO055).

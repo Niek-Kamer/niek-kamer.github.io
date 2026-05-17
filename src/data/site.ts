@@ -89,10 +89,10 @@ export const site: SiteConfig = {
 	featured: [
 		{
 			label: 'Featured project',
-			name: 'zkmcu',
-			url: 'https://zkmcu.dev/',
+			name: 'Plonky3 Goldilocks performance',
+			url: '/projects/plonky3-goldilocks-perf',
 			summary:
-				'A no_std Rust Groth16/BN254 verifier that runs on a $7 RP2350 microcontroller in ~1 second.',
+				'Plonky3 maintainer. Goldilocks Poseidon perf work on aarch64 NEON and x86 AVX — 26-31% per-permute speedups across architectures.',
 		},
 	],
 	cloudflareAnalyticsToken: 'a649319688e04742a47da5fd8a42ddba',

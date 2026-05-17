@@ -13,7 +13,7 @@ tags:
     "x86",
     "aarch64",
   ]
-math: false
+math: true
 toc: false
 headlineMetric:
   label: "Zen 5 AVX-2 Poseidon2 (W=8)"
@@ -56,14 +56,14 @@ So the fix shape was to put both states' round structure inside one function sco
 
 Per-permute mean ns/permute, five seeds × N=1M each, post-#1645 baseline:
 
-| Width | ISA              | Single | Batched B=2 | Reduction       |
-| ----: | ---------------- | -----: | ----------: | --------------- |
-|     8 | Zen 5 AVX-2 (4L) |   1734 |        1243 | **~27.2% ± 0.7** |
-|     8 | Zen 5 AVX-512 (8L) |  1715 |        1170 | **~31.5% ± 0.9** |
-|     8 | Pi 5 NEON (2L)   |   3891 |        3473 | **~10.82% ± 0.08** |
-|    12 | Zen 5 AVX-2 (4L) |   2260 |        1846 | **~18.6% ± 0.2** |
-|    12 | Zen 5 AVX-512 (8L) |  2284 |        1676 | **~26.6% ± 0.3** |
-|    12 | Pi 5 NEON (2L)   |   5678 |        5530 | **~2.65% ± 0.04** |
+| Width | ISA              | Single | Batched $B=2$ | Reduction       |
+| ----: | ---------------- | -----: | ------------: | --------------- |
+|     8 | Zen 5 AVX-2 (4L) |   1734 |          1243 | **~27.2% ± 0.7** |
+|     8 | Zen 5 AVX-512 (8L) |  1715 |          1170 | **~31.5% ± 0.9** |
+|     8 | Pi 5 NEON (2L)   |   3891 |          3473 | **~10.82% ± 0.08** |
+|    12 | Zen 5 AVX-2 (4L) |   2260 |          1846 | **~18.6% ± 0.2** |
+|    12 | Zen 5 AVX-512 (8L) |  2284 |          1676 | **~26.6% ± 0.3** |
+|    12 | Pi 5 NEON (2L)   |   5678 |          5530 | **~2.65% ± 0.04** |
 
 Five of six measured cells reduce by more than ten percent per permute. The floor is Pi 5 NEON at width 12: 2.65%, small but stable across seeds.
 
@@ -71,19 +71,19 @@ Five of six measured cells reduce by more than ten percent per permute. The floo
 
 Wall-time wins are necessary evidence but not sufficient. They tell you the kernel is faster; they don't tell you _why_. To confirm the OoO-slack story I'd been telling about the boundary, I wanted microarchitectural data: if the mechanism was real, IPC should jump while instruction count per permute stayed flat.
 
-I ran the same B=2 transformation on the sibling Poseidon1 port (separate investigation, same mechanism applied to a different round structure) and pulled retired-instruction and cycle counts via `perf stat`. Mean over the same 5 seeds:
+I ran the same $B=2$ transformation on the sibling Poseidon1 port (separate investigation, same mechanism applied to a different round structure) and pulled retired-instruction and cycle counts via `perf stat`. Mean over the same 5 seeds:
 
-| metric                  |   single | batched B=2 | Δ              |
-| ----------------------- | -------: | ----------: | -------------- |
-| IPC                     |    2.484 |       2.954 | **+18.9%**     |
-| instructions / permute  |        K |       2.7×K | matches B=2    |
-| register spill rate     |     7.2% |        4.5% | **lower**      |
+| metric                  |   single | batched $B=2$ | $\Delta$         |
+| ----------------------- | -------: | ------------: | ---------------- |
+| IPC                     |    2.484 |         2.954 | **+18.9%**       |
+| instructions / permute  |      $K$ |       $2.7K$ | matches $B=2$    |
+| register spill rate     |     7.2% |          4.5% | **lower**        |
 
 Three things to read out of that.
 
 IPC jumps 18.9%. That's "more ops retiring per cycle", which is exactly the shape you'd predict if the bottleneck was issue-slot underutilization and not memory bandwidth or instruction count. The OoO engine had spare slots; the single-permute kernel wasn't filling them.
 
-Instruction count per permute scales ~2.7×, not the naïve 2×. That's consistent with the 2 states × full-round-then-partial-round structure: the partial rounds are skinnier than full rounds, so two states share less work proportionally in the partial-round body than in the full-round body. The win isn't "fewer instructions"; it's "same instructions retiring faster".
+Instruction count per permute scales $\sim$2.7×, not the naïve 2×. That's consistent with the 2 states × full-round-then-partial-round structure: the partial rounds are skinnier than full rounds, so two states share less work proportionally in the partial-round body than in the full-round body. The win isn't "fewer instructions"; it's "same instructions retiring faster".
 
 Register spill rate drops _despite_ doubling the live state. This was the counter-intuitive one. Hand-rolling appears to give the register allocator better information about live ranges; cross-state ops don't compete for the same register windows the way intra-state ops do. The result is fewer stack reloads per permute, not more.
 
@@ -93,9 +93,9 @@ All three lined up with the wall-time numbers. The mechanism is real.
 
 The mechanism requires spare execution-port issue width and OoO reorder budget. Cortex-A76 has 2 NEON pipes; Zen 5 has 4 vector pipes. Plus a smaller OoO window on the A76 side. Width 12's internal-round path (`internal_layer_mat_mul_goldilocks_12`) does more ops per round than width 8, which means single-permute is closer to pipe saturation on NEON. Less slack to harvest. The NEON width 12 number is 2.65%, the floor across all six measured cells.
 
-To confirm pipe-saturation rather than some other ceiling, I ran a B=4 probe on width 8: four states interleaved instead of two. NEON has 32 v-registers; 4 × 8 = 32 hot state regs fits with no spill budget. The result: B=4 _lost_ to B=2 on NEON (mean 10.55% vs 11.16% reduction across five seeds, B=4 0.6pp worse). On x86 the same B=4 probe _won_ another 2-4pp at both AVX-2 and AVX-512.
+To confirm pipe-saturation rather than some other ceiling, I ran a $B=4$ probe on width 8: four states interleaved instead of two. NEON has 32 v-registers; $4 \times 8 = 32$ hot state regs fits with no spill budget. The result: $B=4$ _lost_ to $B=2$ on NEON (mean 10.55% vs 11.16% reduction across five seeds, $B=4$ 0.6pp worse). On x86 the same $B=4$ probe _won_ another 2-4pp at both AVX-2 and AVX-512.
 
-So the ceiling has a clean shape. NEON's two vector pipes saturate around B=2 and adding more states past that doesn't help. x86 still has spare issue width at B=4. The B=2 sweet spot is the cross-arch one. It captures most of the x86 win without losing the NEON win to register pressure.
+So the ceiling has a clean shape. NEON's two vector pipes saturate around $B=2$ and adding more states past that doesn't help. x86 still has spare issue width at $B=4$. The $B=2$ sweet spot is the cross-arch one. It captures most of the x86 win without losing the NEON win to register pressure.
 
 ## Where this applies
 
