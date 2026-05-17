@@ -67,7 +67,7 @@ export const site: SiteConfig = {
 				platform: 'linkedin',
 				url: 'https://www.linkedin.com/in/niek-kamer-061bb2344/',
 			},
-			{ platform: 'telegram', url: 'https://t.me/NiekK015', handle: '@Niek01' },
+			{ platform: 'telegram', url: 'https://t.me/NiekK01', handle: '@NiekK01' },
 			{
 				platform: 'hackernews',
 				url: 'https://news.ycombinator.com/user?id=niekkamer',
