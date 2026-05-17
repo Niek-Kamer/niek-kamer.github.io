@@ -68,6 +68,7 @@ const mainPadding = sprinkles({
 		</script>
 		{site.cloudflareAnalyticsToken && (
 			<script
+				is:inline
 				defer
 				src="https://static.cloudflareinsights.com/beacon.min.js"
 				data-cf-beacon={`{"token": "${site.cloudflareAnalyticsToken}"}`}

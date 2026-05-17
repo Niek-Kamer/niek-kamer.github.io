@@ -6,7 +6,7 @@ import Stack from '../components/primitives/Stack.astro';
 import Icon from '../components/icons/Icon.astro';
 import { sprinkles } from '../styles/sprinkles.css';
 import { prose } from '../styles/prose.css';
-import { site } from '../data/site';
+import { site, type SocialLink } from '../data/site';
 
 const heading = sprinkles({
 	fontSize: 'h1',
@@ -28,7 +28,7 @@ const labelFor: Record<string, string> = {
 	website: 'Website',
 };
 
-const channels = [
+const channels: SocialLink[] = [
 	{
 		platform: 'email',
 		url: 'mailto:info@axobello.com',
